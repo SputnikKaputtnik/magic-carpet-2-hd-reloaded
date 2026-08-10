@@ -1,4 +1,4 @@
-{
+﻿{
 	"settings": [
 		{
 			"name": "RegressionTest",
@@ -39,7 +39,7 @@
 			},
 			"game": {
 				"loggingLevel": "Debug",
-				"maxGameFps": 30
+				"maxGameFps": 30,
 				"skipIntro": true
 			}
 		}
