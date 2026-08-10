@@ -81,6 +81,14 @@ remc2/memimages/regressions/*.bin
 *.sln.docstates
 
 # Build results
+# Local development scratch area.  work/gpu-test holds an installed copy of the
+# game (NETHERW, CD_FILES, speech, music) that the pixel comparisons and the
+# renderer regressions run against - those are commercial assets and must never
+# be committed.
+work/
+work-vcpkg-installed/
+BufferOut/
+
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
