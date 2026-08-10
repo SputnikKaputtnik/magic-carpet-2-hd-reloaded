@@ -11,4 +11,4 @@ extern uint32_t screenWidth_18062C;
 extern int iScreenWidth_DE560;
 extern uint8_t* ViewPortRenderBufferStart_DE558;
 extern uint8_t* ViewPortRenderBufferAltStart_DE554;
-inline extern const char* VersionNumber = "Beta";
+inline extern const char* VersionNumber = "Magic Carpet 2 HD - Reloaded fork 1.0";
