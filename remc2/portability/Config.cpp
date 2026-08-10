@@ -187,6 +187,8 @@ Config::Settings::Game Config::GetGame(const json& settings)
 	{
 		const auto& game = settings["game"];
 		gameValues.m_MaxGameFps = ReadIntValue(game, "maxGameFps");
+		if (game.contains("simulationFps"))
+			gameValues.m_SimulationFps = ReadIntValue(game, "simulationFps");
 		gameValues.m_SkipIntro = ReadBoolValue(game, "skipIntro");
 	}
 	return gameValues;
@@ -195,6 +197,14 @@ Config::Settings::Game Config::GetGame(const json& settings)
 Config::Settings::Controls Config::GetControls(const json& settings)
 {
 	Config::Settings::Controls controlValues;
+
+	// Guarded like the multiplayer and game sections above: a config without a
+	// controls section (the regression test config is one) otherwise trips the
+	// nlohmann assert in a debug build and reads undefined data in release.
+	if (!settings.contains("controls"))
+	{
+		return controlValues;
+	}
 
 	const auto& controls = settings["controls"];
 
@@ -335,6 +345,11 @@ Config::Settings::Graphics Config::GetGraphics(const json& settings)
 		graphicsValues.m_WindowResHeight = ReadIntValue(graphics, "windowResHeight");
 		graphicsValues.m_MaintainAspectRatio = ReadBoolValue(graphics, "maintainAspectRatio");
 		graphicsValues.m_StartWindowed = ReadBoolValue(graphics, "startWindowed");
+		graphicsValues.m_GpuPalettePresentation = graphics.value("gpuPalettePresentation", false);
+		graphicsValues.m_GpuWorldGeometry = graphics.value("gpuWorldGeometry", false);
+		graphicsValues.m_GpuSprites = graphics.value("gpuSprites", false);
+		graphicsValues.m_GpuExactBlend = graphics.value("gpuExactBlend", true);
+		graphicsValues.m_GpuSky = graphics.value("gpuSky", false);
 
 		graphicsValues.m_GameDetail = GetGameDetail(graphics);
 		graphicsValues.m_Threading = GetThreading(graphics);
@@ -483,6 +498,11 @@ void Config::SaveGraphicsToDoc(Config::Settings::Graphics graphics)
 	SetInt(gfx, "windowResHeight", graphics.m_WindowResHeight);
 	SetBool(gfx, "maintainAspectRatio", graphics.m_MaintainAspectRatio);
 	SetBool(gfx, "startWindowed", graphics.m_StartWindowed);
+	SetBool(gfx, "gpuPalettePresentation", graphics.m_GpuPalettePresentation);
+	SetBool(gfx, "gpuWorldGeometry", graphics.m_GpuWorldGeometry);
+	SetBool(gfx, "gpuSprites", graphics.m_GpuSprites);
+	SetBool(gfx, "gpuExactBlend", graphics.m_GpuExactBlend);
+	SetBool(gfx, "gpuSky", graphics.m_GpuSky);
 	SaveGameDetailToDoc(graphics.m_GameDetail);
 	SaveThreadingToDoc(graphics.m_Threading);
 }
@@ -523,6 +543,7 @@ void Config::SaveGameToDoc(Config::Settings::Game gameSettings)
 	auto& settingsEntry = GetOrCreateActiveSettingsEntry();
 	auto& game = GetOrCreate(settingsEntry, "game");
 	SetInt(game, "maxGameFps", gameSettings.m_MaxGameFps);
+	SetInt(game, "simulationFps", gameSettings.m_SimulationFps);
 	SetBool(game, "skipIntro", gameSettings.m_SkipIntro);
 }
 

@@ -96,6 +96,11 @@ public:
 			int m_WindowResHeight = 480;
 			bool m_MaintainAspectRatio = true;
 			bool m_StartWindowed = false;
+			bool m_GpuPalettePresentation = false;
+			bool m_GpuWorldGeometry = false;
+			bool m_GpuSprites = false;
+			bool m_GpuExactBlend = true;
+			bool m_GpuSky = false;
 			GameDetail m_GameDetail;
 			Threading m_Threading;
 		};
@@ -103,6 +108,7 @@ public:
 		struct Game
 		{
 			int m_MaxGameFps = 0;
+			int m_SimulationFps = 24;
 			bool m_SkipIntro = false;
 		};
 

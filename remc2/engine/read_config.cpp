@@ -22,6 +22,7 @@
 int config_skip_screen;
 int texturepixels = 32;
 int maxGameFps = 30;
+int simulationFps = 24;
 int menuFps = 30;
 int displayIndex = 0;
 int windowResWidth = 640;
@@ -31,6 +32,11 @@ int gameResHeight = 480;
 int gameUiScale = 1;
 bool maintainAspectRatio = false;
 bool startWindowed = false;
+bool gpuPalettePresentation = false;
+bool gpuWorldGeometry = false;
+bool gpuSprites = false;
+bool gpuExactBlend = true;
+bool gpuSky = false;
 bool bigTextures = false;
 bool bigSprites = false;
 bool fixedMenuGraphics = false;
@@ -129,6 +135,9 @@ bool SetConfig() {
 
 	//Game
 	maxGameFps = settingsValue.m_Game.m_MaxGameFps;
+	simulationFps = settingsValue.m_Game.m_SimulationFps > 0
+		? settingsValue.m_Game.m_SimulationFps
+		: 24;
 	if (settingsValue.m_Game.m_SkipIntro)
 		config_skip_screen = 1;
 	else
@@ -168,6 +177,11 @@ bool SetConfig() {
 	}
 	maintainAspectRatio = settingsValue.m_Graphics.m_MaintainAspectRatio;
 	startWindowed = settingsValue.m_Graphics.m_StartWindowed;
+	gpuPalettePresentation = settingsValue.m_Graphics.m_GpuPalettePresentation;
+	gpuWorldGeometry = settingsValue.m_Graphics.m_GpuWorldGeometry;
+	gpuSprites = settingsValue.m_Graphics.m_GpuSprites;
+	gpuExactBlend = settingsValue.m_Graphics.m_GpuExactBlend;
+	gpuSky = settingsValue.m_Graphics.m_GpuSky;
 	gameResWidth = settingsValue.m_Graphics.m_GameDetail.m_GameResWidth;
 	gameResHeight = settingsValue.m_Graphics.m_GameDetail.m_GameResHeight;
 	if (gameResWidth < 320 || gameResHeight < 200)
@@ -215,7 +229,9 @@ bool SetConfig() {
 	sky = settingsValue.m_Graphics.m_GameDetail.m_Sky;
 	reflections = settingsValue.m_Graphics.m_GameDetail.m_Reflections;
 	dynamicLighting = settingsValue.m_Graphics.m_GameDetail.m_DynamicLighting;
-	if (settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale > 0 && settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale < 4)
+	// Scale 4 covers 84 x 160 tiles of the 256 x 256 map, so the byte sized
+	// tile step table still walks the map without wrapping onto itself.
+	if (settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale > 0 && settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale < 5)
 		viewDistanceScale = settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale;
 
 	multiThreadedRender = settingsValue.m_Graphics.m_Threading.m_IsActive;

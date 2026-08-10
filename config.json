@@ -44,13 +44,15 @@
 					"displayIndex: Decides which display to use, if it cannot find a display at the index, it will find the first one big enough.",
 					"windowResWidth: Window resolution, cannot be greater than resolution of chosen display",
 					"maintainAspectRatio: If set to false, whole window will be used for menu screen etc... stretching content",
-					"startWindowed: set to true to start windowed. Use Alt-Enter to change in game to windowed mode"
+					"startWindowed: set to true to start windowed. Use Alt-Enter to change in game to windowed mode",
+					"gpuPalettePresentation: Experimental Windows D3D11 path that resolves the 8-bit palette and scales the frame on the GPU"
 				],
 				"displayIndex": 0,
 				"windowResWidth": 1920,
 				"windowResHeight": 1080,
 				"maintainAspectRatio": true,
 				"startWindowed": false,
+				"gpuPalettePresentation": true,
 				"gameDetail": {
 					"description": [
 						"gameResWidth: In Game resolution. If using software render keep this low",
@@ -64,7 +66,7 @@
 						"sky: Turns the sky on or off. Can be changed in-game",
 						"reflections: Turns the reflections on or off. Can be changed in-game",
 						"dynamicLighting: Turns the dynamic terrain lighting on or off. Can be changed in-game",
-						"viewDistanceScale: Increases the view distance (will effect performance). '1' = Original distance, '2' = 2x, '3' = 3x (Max)"
+						"viewDistanceScale: Increases the view distance (will effect performance). '1' = Original distance, '2' = 2x, '3' = 3x, '4' = 4x (Max)"
 					],
 					"gameResWidth": 1920,
 					"gameResHeight": 1080,
@@ -95,9 +97,11 @@
 			},
 			"game": {
 				"description": [
-					"maxGameFps: max frames per second in game. Locks the frame rate.  Delete or set to 0 to unlock"
+					"maxGameFps: presentation frame-rate limit. Delete or set to 0 to unlock",
+					"simulationFps: fixed game-logic rate, independent of presentation. 24 preserves the original ReMC2 game speed"
 				],
-				"maxGameFps": 24
+				"maxGameFps": 24,
+				"simulationFps": 24
 			},
 			"controls": {
 				"mouse": [

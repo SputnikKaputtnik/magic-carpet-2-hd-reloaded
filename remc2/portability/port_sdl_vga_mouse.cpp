@@ -2,12 +2,17 @@
 #include "port_sdl_joystick.h"
 #include "port_sdl_vga_mouse.h"
 #include "port_time.h"
+#include "GpuPalettePresenter.h"
+#include "GpuRenderDevice.h"
+#include "GpuWorldRenderer.h"
 
 #include <cstdint>
+#include <memory>
 
 #include "../engine/sub_main_mouse.h"
 #include "../engine/read_config.h"
 #include "../engine/CommandLineParser.h"
+#include "../utilities/RenderProfiler.h"
 
 #ifdef USE_DOSBOX
 extern DOS_Device* DOS_CON;
@@ -19,6 +24,7 @@ extern DOS_Device* DOS_CON;
 SDL_Window* m_window = nullptr;
 SDL_Renderer* m_renderer = nullptr;
 SDL_Texture* m_texture = nullptr;
+std::unique_ptr<GpuPalettePresenter> m_gpuPalettePresenter;
 SDL_Surface* m_gamePalletisedSurface = nullptr;
 SDL_Surface* m_gameRGBASurface = nullptr;
 SDL_Color m_currentPalletColours[256];
@@ -151,11 +157,74 @@ void VGA_Init(Uint32  /*flags*/, int windowWidth, int windowHeight, int gameResW
 			m_window = SDL_CreateWindow(default_caption, display.x, display.y, display.w, display.h, SDL_WINDOW_FULLSCREEN_DESKTOP);
 			ToggleFullscreen(!startWindowed);
 
-			m_renderer =
-				SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED |
-					SDL_RENDERER_TARGETTEXTURE);
+			if (gpuPalettePresentation)
+			{
+				m_gpuPalettePresenter = std::make_unique<GpuPalettePresenter>();
+				if (!m_gpuPalettePresenter->Initialize(m_window))
+				{
+					Logger->warn(
+						"D3D11 palette presenter could not be initialized: {}. Falling back to SDL.",
+						m_gpuPalettePresenter->GetLastError());
+					m_gpuPalettePresenter.reset();
+				}
+				else
+				{
+					Logger->info("Using D3D11 GPU palette presenter");
 
-			SDL_SetRenderDrawColor(m_renderer, 0x00, 0x00, 0x00, 0xFF);
+					if (gpuWorldGeometry)
+					{
+						GpuWorldRenderer& worldRenderer = GpuWorldRenderer::Get();
+						if (worldRenderer.Initialize())
+						{
+							worldRenderer.SetGeometryEnabled(true);
+							Logger->info("Using D3D11 GPU world geometry rasterizer");
+							if (gpuSprites)
+							{
+								worldRenderer.SetSpritesEnabled(true);
+								Logger->info("Using D3D11 GPU world sprites");
+							}
+							worldRenderer.SetExactBlendEnabled(gpuExactBlend);
+							worldRenderer.SetSkyEnabled(gpuSky);
+							worldRenderer.SetTriangleCullMode(CommandLineParams.GetCullMode());
+							if (worldRenderer.SupportsDestinationReads())
+							{
+								Logger->info(
+									"Using rasterizer ordered views for exact destination blends");
+								if (worldRenderer.IsSkyEnabled())
+								{
+									Logger->info("Using D3D11 GPU sky");
+								}
+							}
+							else
+							{
+								Logger->info(
+									"Destination blends approximate ({})",
+									worldRenderer.GetOrderedViewsDiagnostic().empty()
+										? "disabled via gpuExactBlend"
+										: worldRenderer.GetOrderedViewsDiagnostic());
+							}
+						}
+						else
+						{
+							Logger->warn(
+								"D3D11 world renderer could not be initialized: {}. "
+								"World geometry stays on the CPU.",
+								worldRenderer.GetLastError());
+						}
+					}
+					Logger->flush();
+				}
+			}
+
+			if (!m_gpuPalettePresenter)
+			{
+				m_renderer =
+					SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED |
+						SDL_RENDERER_TARGETTEXTURE);
+			}
+
+			if (m_renderer)
+				SDL_SetRenderDrawColor(m_renderer, 0x00, 0x00, 0x00, 0xFF);
 
 			// Now create your surface and convert the pixel format right away!
 			// Converting the pixel format to match the texture makes for quicker updates, otherwise
@@ -164,11 +233,15 @@ void VGA_Init(Uint32  /*flags*/, int windowWidth, int windowHeight, int gameResW
 
 			CreateRenderSurfaces(gameResWidth, gameResHeight);
 
-			SDL_SetTextureBlendMode(m_texture, SDL_BLENDMODE_BLEND);
+			if (m_texture)
+				SDL_SetTextureBlendMode(m_texture, SDL_BLENDMODE_BLEND);
 
 			// Sure clear the screen first.. always nice.
-			SDL_RenderClear(m_renderer);
-			SDL_RenderPresent(m_renderer);
+			if (m_renderer)
+			{
+				SDL_RenderClear(m_renderer);
+				SDL_RenderPresent(m_renderer);
+			}
 
 			SDL_SetWindowMouseRect(m_window, new SDL_Rect{ 0, 0, 640, 480 });
 
@@ -236,19 +309,22 @@ void CreateRenderSurfaces(int width, int height)
 		SDL_ConvertSurfaceFormat(
 			m_gamePalletisedSurface, SDL_PIXELFORMAT_INDEX8, 0);
 
-	m_gameRGBASurface =
-		SDL_CreateRGBSurface(
-			SDL_SWSURFACE, width, height, 24,
-			redMask, greenMask, blueMask, alphaMask);
+	if (!m_gpuPalettePresenter)
+	{
+		m_gameRGBASurface =
+			SDL_CreateRGBSurface(
+				SDL_SWSURFACE, width, height, 24,
+				redMask, greenMask, blueMask, alphaMask);
 
-	m_gameRGBASurface =
-		SDL_ConvertSurfaceFormat(
-			m_gameRGBASurface, SDL_PIXELFORMAT_RGB888, 0);
+		m_gameRGBASurface =
+			SDL_ConvertSurfaceFormat(
+				m_gameRGBASurface, SDL_PIXELFORMAT_RGB888, 0);
 
-	m_texture = SDL_CreateTexture(m_renderer,
-		SDL_PIXELFORMAT_RGB888,
-		SDL_TEXTUREACCESS_STREAMING,
-		m_gameRGBASurface->w, m_gameRGBASurface->h);
+		m_texture = SDL_CreateTexture(m_renderer,
+			SDL_PIXELFORMAT_RGB888,
+			SDL_TEXTUREACCESS_STREAMING,
+			m_gameRGBASurface->w, m_gameRGBASurface->h);
+	}
 }
 
 Uint8* VGA_Get_Palette() {
@@ -1035,7 +1111,8 @@ void VGA_Blit(Uint8* srcBuffer) {
 
 	if (m_iOrigh != m_gamePalletisedSurface->h || m_iOrigw != m_gamePalletisedSurface->w)
 	{
-		SDL_RenderClear(m_renderer);
+		if (m_renderer)
+			SDL_RenderClear(m_renderer);
 		FreeRenderSurfaces();
 		CreateRenderSurfaces(m_iOrigw, m_iOrigh);
 		SDL_SetPaletteColors(m_gamePalletisedSurface->format->palette, m_currentPalletColours, 0, 256);
@@ -1060,8 +1137,28 @@ void VGA_Blit(Uint8* srcBuffer) {
 }
 
 void SubBlit(uint16_t originalResWidth, uint16_t originalResHeight) {
+	ScopedRenderProfile renderProfile(RenderProfileStage::Presentation);
 	while (subBlitLock);//fix problem with quick blitting
 	subBlitLock = true;
+
+	if (m_gpuPalettePresenter && m_gpuPalettePresenter->IsReady())
+	{
+		const bool presented = m_gpuPalettePresenter->Present(
+			static_cast<const uint8_t*>(m_gamePalletisedSurface->pixels),
+			m_gamePalletisedSurface->pitch,
+			m_gamePalletisedSurface->w,
+			m_gamePalletisedSurface->h,
+			originalResWidth,
+			originalResHeight,
+			m_currentPalletColours,
+			m_bMaintainAspectRatio);
+		if (!presented)
+		{
+			Logger->error("D3D11 palette presenter failed: {}", m_gpuPalettePresenter->GetLastError());
+		}
+		subBlitLock = false;
+		return;
+	}
 
 	SDL_Rect rectSrc;
 	rectSrc.x = 0;
@@ -1166,6 +1263,13 @@ void VGA_close()
 	SDL_FreeSurface(m_surfaceFont);
 	m_surfaceFont = nullptr;
 	FreeRenderSurfaces();
+	if (m_gpuPalettePresenter)
+	{
+		GpuWorldRenderer::Get().Shutdown();
+		m_gpuPalettePresenter->Shutdown();
+		m_gpuPalettePresenter.reset();
+		GpuRenderDevice::Get().Shutdown();
+	}
 	SDL_DestroyRenderer(m_renderer);
 	m_renderer = nullptr;
 	SDL_DestroyWindow(m_window);
@@ -1509,6 +1613,12 @@ uint16_t TranslateSdlKeysToGameKeys(uint16_t scancode)
 		break;
 	case SDL_SCANCODE_F10://f10
 		return GameKey::F10;
+		break;
+	case SDL_SCANCODE_F11://f11
+		return GameKey::F11;
+		break;
+	case SDL_SCANCODE_F12://f12
+		return GameKey::F12;
 		break;
 	case SDL_SCANCODE_HOME://home
 		return GameKey::HOME;
