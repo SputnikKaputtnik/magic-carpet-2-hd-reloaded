@@ -57,6 +57,13 @@ class CommandLineParser {
         bool DoRightButton() const {return m_right_button;};
         bool DoTestRegression() const {return m_test_regression;};
         bool DoTestRenderers() const {return m_test_renderers;}; //only for debugging!!!!
+		bool DoProfileRenderer() const { return m_profile_renderer; };
+		int GetDumpWorldFrame() const { return m_dump_world_frame; };
+		int GetProbeSprites() const { return m_probe_sprites; };
+		// Debug: fixed camera roll (0..2047) for deterministic A/B renders.
+		int GetForceRoll() const { return m_force_roll; };
+		// Debug: GPU terrain winding rejection (0 off, 1 drop CW, 2 drop CCW).
+		int GetCullMode() const { return m_cull_mode; };
         bool DoDebugafterload() const {return m_debugafterload;};
         bool DoGraphicsDebug() const {return m_graphics_debug;};
         bool DoHideGraphics() const {return m_hide_graphics;};
@@ -120,7 +127,12 @@ class CommandLineParser {
         bool m_off_pause_5;
         bool m_right_button;
         bool m_test_regression;
-        bool m_test_renderers;
+		bool m_test_renderers;
+		bool m_profile_renderer;
+		int m_dump_world_frame;
+		int m_probe_sprites;
+		int m_force_roll;
+		int m_cull_mode;
         bool m_debugafterload;
         bool m_graphics_debug;
         bool m_hide_graphics;

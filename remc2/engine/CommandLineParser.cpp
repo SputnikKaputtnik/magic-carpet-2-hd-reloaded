@@ -44,6 +44,15 @@ void CommandLineParser::Init(int argc, char **argv) {
     m_right_button = false;
     m_test_regression = false;
     m_test_renderers = false;
+	m_profile_renderer = false;
+    m_dump_world_frame = -1;
+    m_force_roll = -1;
+    // Default 2: drop the winding the software rasteriser rejects as well.
+    // Without it, overdrawn terrain triangles blend a second time once the
+    // destination is read exactly (ROV), which shows up as flat quads where
+    // land tiles meet water.  --cull_mode 0 restores the old behaviour.
+    m_cull_mode = 2;
+    m_probe_sprites = 0;
     m_debugafterload = false;
     m_graphics_debug = false;
     m_hide_graphics = false;
@@ -241,6 +250,7 @@ void CommandLineParser::InterpretParams() {
         else if (param == "--right_button")                     m_right_button = true;
         else if (param == "--test_regression")                  m_test_regression = true;
         else if (param == "--test_renderers")                   m_test_renderers = true;
+        else if (param == "--profile_renderer")                 m_profile_renderer = true;
         else if (param == "--debugafterload")                   m_debugafterload = true;
         else if (param == "--graphics_debug")                   m_graphics_debug = true;
         else if (param == "--hide_graphics")                    m_hide_graphics = true;
@@ -259,6 +269,18 @@ void CommandLineParser::InterpretParams() {
         else if (param == "--config_file_path") {
             m_config_file_path = *(++p);
         }
+		else if (param == "--probe_sprites") {
+			m_probe_sprites = std::stoi(*(++p));
+		}
+		else if (param == "--dump_world_frame") {
+			m_dump_world_frame = std::stoi(*(++p));
+		}
+		else if (param == "--force_roll") {
+			m_force_roll = std::stoi(*(++p));
+		}
+		else if (param == "--cull_mode") {
+			m_cull_mode = std::stoi(*(++p));
+		}
 		else if (param == "--set_level") {
 			std::string levelStr = *(++p);
 			uint16_t level = std::stoi(levelStr);
