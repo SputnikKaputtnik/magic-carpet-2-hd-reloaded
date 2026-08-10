@@ -1407,6 +1407,7 @@ void sub_90478_VGA_Blit320(uint8_t maxFps)//271478
 #if _DEBUG
 	VGA_CalculateAndPrintFps(0, 0, timeDelta.count());
 #endif
+	DrawFpsOverlay(static_cast<float>(timeDelta.count()));
 	VGA_Blit(pdwScreenBuffer_351628);
 #endif
 	//if(dos_key_vect_9)dos_key_vect_9();
@@ -1443,6 +1444,7 @@ void sub_75200_VGA_Blit640(uint16_t height, uint8_t maxFps)//256200
 #if _DEBUG
 	VGA_CalculateAndPrintFps(0, 0, timeDelta.count());
 #endif
+	DrawFpsOverlay(static_cast<float>(timeDelta.count()));
 	VGA_Blit(pdwScreenBuffer_351628);
 
 	//set speed
@@ -1460,6 +1462,7 @@ void VGA_BlitAny(uint8_t maxFps)//256200
 	VGA_CalculateAndPrintFps(0, 0, timeDelta.count());
 	VGA_DrawPlayerCoordData(0, 16);
 #endif
+	DrawFpsOverlay(static_cast<float>(timeDelta.count()));
 	VGA_Blit(pdwScreenBuffer_351628);
 
 	//set speed
@@ -1556,6 +1559,89 @@ std::chrono::duration<double, std::milli> CalculateTimeDelta()
 	std::chrono::duration<double, std::milli> timeDelta = (currTime - m_lastFrameEnd) * 0.001f;
 	m_lastFrameEnd = currTime;
 	return timeDelta;
+}
+
+bool showFpsCounter = false;
+
+// Discreet frame rate readout in the top right corner, toggled with F12.
+// The rate keeps being measured while the display is off, so switching it on
+// shows a valid number straight away instead of counting up from zero.
+// Note the unit: CalculateTimeDelta scales by 0.001 before handing back a
+// millisecond duration, so its count() is in SECONDS despite the type.
+void DrawFpsOverlay(float timeDeltaSeconds)
+{
+	static int frames = 0;
+	static float elapsed = 0.0f;
+	static float fps = 0.0f;
+
+	++frames;
+	elapsed += timeDeltaSeconds;
+	// Menus redraw only on demand, so a pure time window would leave the value
+	// at zero there for a long time; a frame count also closes the window.
+	if (elapsed >= 0.25f || frames >= 30)
+	{
+		if (elapsed > 0.0f)
+		{
+			fps = frames / elapsed;
+		}
+		frames = 0;
+		elapsed = 0.0f;
+	}
+
+	if (!showFpsCounter || !pdwScreenBuffer_351628)
+	{
+		return;
+	}
+
+	char text[16];
+	snprintf(text, sizeof(text), "%d FPS", static_cast<int>(fps + 0.5f));
+
+	// Pick the most saturated green of the current palette instead of a fixed
+	// index, so the readout stays legible when a level swaps its palette.
+	uint8_t colourIndex = 0;
+	if (const uint8_t* palette =
+		xadatapald0dat2.colorPalette_var28 ? *xadatapald0dat2.colorPalette_var28 : nullptr)
+	{
+		int bestScore = -0x7FFF;
+		for (int entry = 1; entry < 256; ++entry)
+		{
+			const int red = palette[entry * 3];
+			const int green = palette[entry * 3 + 1];
+			const int blue = palette[entry * 3 + 2];
+			const int score = 2 * green - red - blue;
+			if (score > bestScore)
+			{
+				bestScore = score;
+				colourIndex = static_cast<uint8_t>(entry);
+			}
+		}
+	}
+
+	constexpr int scale = 1;              // the game font advances 8 * scale
+	const int width = static_cast<int>(strlen(text)) * 8 * scale;
+
+	// Sit just below the UI bar rather than on top of it.  The bar height is
+	// wherever the world viewport starts, so derive it instead of hard coding.
+	extern uint8_t* ViewPortRenderBufferStart_DE558;
+	int y = 4;
+	if (ViewPortRenderBufferStart_DE558 && pdwScreenBuffer_351628 && iScreenWidth_DE560 > 0)
+	{
+		const ptrdiff_t viewportOffset =
+			ViewPortRenderBufferStart_DE558 - pdwScreenBuffer_351628;
+		if (viewportOffset > 0)
+		{
+			y = static_cast<int>(viewportOffset / iScreenWidth_DE560) + 4;
+		}
+	}
+
+	extern char FontType_D419D;
+	GetFont_6FC50(FontType_D419D);
+	DrawText_2BC10(
+		text,
+		static_cast<int16_t>(iScreenWidth_DE560 - width - 8),
+		static_cast<int16_t>(y),
+		colourIndex,
+		scale);
 }
 
 void VGA_CalculateAndPrintFps(int x, int y, float timeDelta)

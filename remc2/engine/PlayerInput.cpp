@@ -302,6 +302,16 @@ void ProcessKeyboardPresses_17190()//1f8190
 						LastPressedKey_1806E4 = 0;
 						break;
 					}
+					case 0x57: {//shift+f11 - cycle view distance
+						ChangeSettings_1A970(21, 0, 0);
+						LastPressedKey_1806E4 = 0;
+						break;
+					}
+					case 0x58: {//shift+f12 - toggle fps counter
+						ChangeSettings_1A970(22, 0, 0);
+						LastPressedKey_1806E4 = 0;
+						break;
+					}
 					}
 				}
 				else
@@ -1549,6 +1559,27 @@ void ChangeSettings_1A970(char a1, int a2, int a3)//1fb970
 				D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].ShowDebugTextFlag_0x005_2BE0_11235 = 0x00;
 				break;
 		}
+		return;
+	case 21:
+		// F11: cycle the view distance 1 -> 2 -> 3 -> 4 -> 1.  Only the HD
+		// renderer has a scalable tile grid.
+		if (m_ptrGameRender != nullptr && typeid(*m_ptrGameRender) == typeid(GameRenderHD))
+		{
+			uint8_t scale = ((GameRenderHD*)m_ptrGameRender)->GetViewDistanceScale();
+			scale = (scale >= 4) ? 1 : static_cast<uint8_t>(scale + 1);
+			((GameRenderHD*)m_ptrGameRender)->SetViewDistanceScale(scale);
+			viewDistanceScale = scale;
+
+			static char message[32];
+			snprintf(message, sizeof(message), "View distance %dx", scale);
+			SetCurrentNotificationMessage_19760(message, 3u, 50);
+		}
+		return;
+	case 22:
+		// F12: frame rate readout in the top right corner.
+		showFpsCounter = !showFpsCounter;
+		SetCurrentNotificationMessage_19760(
+			showFpsCounter ? "FPS counter ON" : "FPS counter OFF", 3u, 50);
 		return;
 	default:
 		return;

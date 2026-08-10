@@ -577,6 +577,9 @@ void DrawText_2BC10(const char* textbuffer, int16_t posx, int16_t posy, uint8_t 
 void SetFrameStart(std::chrono::system_clock::time_point frameStart);
 std::chrono::duration<double, std::milli> CalculateTimeDelta();
 void VGA_CalculateAndPrintFps(int x, int y, float timeDelta);
+// Frame rate readout in the top right corner, toggled with F12.
+extern bool showFpsCounter;
+void DrawFpsOverlay(float timeDeltaSeconds);
 void VGA_DrawPlayerCoordData(int x, int y);
 void VGA_BlitAny(uint8_t maxFps = 0);
 void LockFps(uint8_t maxFps);
