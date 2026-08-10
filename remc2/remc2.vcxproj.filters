@@ -96,6 +96,9 @@
     <ClInclude Include="utilities\RendererTests.h">
       <Filter>Header Files\utilities</Filter>
     </ClInclude>
+    <ClInclude Include="utilities\RenderProfiler.h">
+      <Filter>Header Files\utilities</Filter>
+    </ClInclude>
     <ClInclude Include="utilities\StateMonitor.h">
       <Filter>Header Files\utilities</Filter>
     </ClInclude>
@@ -192,6 +195,9 @@
     <ClInclude Include="portability\fcaseopen.h">
       <Filter>Header Files\portability</Filter>
     </ClInclude>
+	<ClInclude Include="portability\GpuPalettePresenter.h">
+	  <Filter>Header Files\portability</Filter>
+	</ClInclude>
     <ClInclude Include="engine\TypeConfigDat.h">
       <Filter>Header Files\engine</Filter>
     </ClInclude>
@@ -368,6 +374,9 @@
     <ClCompile Include="portability\port_filesystem.cpp">
       <Filter>Source Files\portability</Filter>
     </ClCompile>
+	<ClCompile Include="portability\GpuPalettePresenter.cpp">
+	  <Filter>Source Files\portability</Filter>
+	</ClCompile>
     <ClCompile Include="portability\port_outputs.cpp">
       <Filter>Source Files\portability</Filter>
     </ClCompile>
@@ -399,6 +408,9 @@
       <Filter>Source Files\utilities</Filter>
     </ClCompile>
     <ClCompile Include="utilities\RendererTests.cpp">
+      <Filter>Source Files\utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="utilities\RenderProfiler.cpp">
       <Filter>Source Files\utilities</Filter>
     </ClCompile>
     <ClCompile Include="utilities\StateMonitor.cpp">

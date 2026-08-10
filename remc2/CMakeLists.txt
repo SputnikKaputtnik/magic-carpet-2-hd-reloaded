@@ -124,6 +124,10 @@ set(SOURCE_FILES_ENGINE
     "utilities/Maths.h"
     "utilities/RendererTests.cpp"
     "utilities/RendererTests.h"
+    "utilities/RenderProfiler.cpp"
+    "utilities/RenderProfiler.h"
+    "utilities/SpriteProbe.cpp"
+    "utilities/SpriteProbe.h"
     "utilities/StateMonitor.cpp"
     "utilities/StateMonitor.h"
     "build_config.h"
@@ -175,6 +179,12 @@ set(SOURCE_FILES__portability
     "portability/Config.h"
     "portability/fcaseopen.cpp"
     "portability/fcaseopen.h"
+	"portability/GpuPalettePresenter.cpp"
+	"portability/GpuPalettePresenter.h"
+	"portability/GpuRenderDevice.cpp"
+	"portability/GpuRenderDevice.h"
+	"portability/GpuWorldRenderer.cpp"
+	"portability/GpuWorldRenderer.h"
     "portability/GameKey.h"
     "portability/KeyboardInputMapping.h"
     "portability/MouseInputMapping.h"
@@ -213,6 +223,15 @@ set(ALL_FILES
 ################################################################################
 add_library(findfirst ${SOURCE_FILES__libs__findfirst})
 add_executable(${PROJECT_NAME} ${ALL_FILES})
+
+option(REMC2_ENABLE_AVX2 "Build an x64 binary optimized for AVX2-capable CPUs" OFF)
+if(MSVC AND REMC2_ENABLE_AVX2)
+	target_compile_options(${PROJECT_NAME} PRIVATE /arch:AVX2)
+endif()
+
+if (WIN32)
+	target_link_libraries(${PROJECT_NAME} PRIVATE d3d11 dxgi d3dcompiler)
+endif ()
 
 install(
     TARGETS ${PROJECT_NAME}

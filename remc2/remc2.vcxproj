@@ -330,7 +330,8 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(REMC2EnableAVX2)'!='true'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(REMC2EnableAVX2)'=='true'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -460,6 +461,9 @@
     <ClInclude Include="portability\ConfigToSdlScancodeMapping.h" />
     <ClInclude Include="portability\fcaseopen.h" />
     <ClInclude Include="portability\GameKey.h" />
+	<ClInclude Include="portability\GpuPalettePresenter.h" />
+	<ClInclude Include="portability\GpuRenderDevice.h" />
+	<ClInclude Include="portability\GpuWorldRenderer.h" />
     <ClInclude Include="portability\KeyboardInputMapping.h" />
     <ClInclude Include="portability\MouseInputMapping.h" />
     <ClInclude Include="portability\InputRecorder.h" />
@@ -472,6 +476,8 @@
     <ClInclude Include="utilities\DataFileRNC.h" />
     <ClInclude Include="utilities\StateMonitor.h" />
     <ClInclude Include="utilities\RendererTests.h" />
+    <ClInclude Include="utilities\RenderProfiler.h" />
+    <ClInclude Include="utilities\SpriteProbe.h" />
     <ClInclude Include="engine\ail_sound.h" />
     <ClInclude Include="engine\defs.h" />
     <ClInclude Include="engine\engine_support.h" />
@@ -545,6 +551,9 @@
     <ClCompile Include="portability\Config.cpp" />
     <ClCompile Include="portability\dirent.c" />
     <ClCompile Include="portability\fcaseopen.cpp" />
+	<ClCompile Include="portability\GpuPalettePresenter.cpp" />
+	<ClCompile Include="portability\GpuRenderDevice.cpp" />
+	<ClCompile Include="portability\GpuWorldRenderer.cpp" />
     <ClCompile Include="portability\InputRecorder.cpp" />
     <ClCompile Include="portability\port_net.cpp" />
     <ClCompile Include="portability\port_sdl_joystick.cpp" />
@@ -554,6 +563,8 @@
     <ClCompile Include="utilities\DataFileRNC.cpp" />
     <ClCompile Include="utilities\StateMonitor.cpp" />
     <ClCompile Include="utilities\RendererTests.cpp" />
+    <ClCompile Include="utilities\RenderProfiler.cpp" />
+    <ClCompile Include="utilities\SpriteProbe.cpp" />
     <ClCompile Include="engine\engine_support.cpp" />
     <ClCompile Include="engine\engine_support_converts.cpp" />
     <ClCompile Include="engine\read_config.cpp" />
