@@ -50,7 +50,7 @@ private:
 	const int m_bufferOffset_E9C38_2 = 1161216; // 14%
 	const int m_bufferOffset_E9C38_3 = 1658880; // 20%
 
-	TileStepQuadrant* m_tileRenderStepTable_D4328x;
+	TileStepQuadrant* m_tileRenderStepTable_D4328x = nullptr;
 
 	uint8_t unk_DE56Cx[8][4194304]; //Number of possible render threads (8) //number of polygons (2048 * 2048)
 	
@@ -70,7 +70,7 @@ private:
 	};
 
 	type_unk_F0E20x m_str_F0E20x[GAME_RES_MAX_WIDTH + 100]; // Originally 640
-	type_E9C38_smalltit* m_ptrStr_E9C38_smalltit;
+	type_E9C38_smalltit* m_ptrStr_E9C38_smalltit = nullptr;
 	uint16_t m_tileRows = TILE_ROWS_COUNT;
 	uint16_t m_tileColumns = TILE_COLUMNS_COUNT;
 	float m_sizePercentToThreadRender = 10.0;
@@ -127,6 +127,7 @@ private:
 	void StopWorkerThreads();
 	void WaitForRenderFinish();
 	void BuildTileRenderStepTable(TileStepQuadrant* table, int cols);
+	void ApplyViewDistanceScale(uint8_t viewDistanceScale);
 	bool CheckIfThreadRenderTriangle(ProjectionPolygon v1, ProjectionPolygon v2, ProjectionPolygon v3, ProjectionPolygon v4);
 	bool CheckViewPortCull(ProjectionPolygon v1, ProjectionPolygon v2, ProjectionPolygon v3, int maxCoordinate = 2147483647, int minCoordinate = -2147483647);
 
@@ -136,6 +137,9 @@ public:
 	
 	void SetRenderThreads(uint8_t renderThreads);
 	uint8_t GetRenderThreads();
+
+	void SetViewDistanceScale(uint8_t viewDistanceScale) override;
+	uint8_t GetViewDistanceScale() const override { return m_viewDistanceScale; }
 
 	void DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ, int16_t pitch, int16_t roll, int16_t fov);
 	void WriteWorldToBMP();

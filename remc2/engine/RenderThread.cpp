@@ -1,5 +1,6 @@
 #include "RenderThread.h"
 #include <mutex>
+#include <utility>
 
 RenderThread::RenderThread()
 {
@@ -46,6 +47,7 @@ void RenderThread::StartWorkerThread(int8_t core)
 	m_running = true;
 	m_core = core;
 	m_renderThread = std::thread([this, core] {
+		constexpr int taskSpinCount = 4096;
 
 #ifdef _MSC_VER
 		if (core >= 0) {
@@ -54,22 +56,37 @@ void RenderThread::StartWorkerThread(int8_t core)
 		}
 #endif
 
-		std::unique_lock<std::mutex> lock(m_taskMutex, std::defer_lock);
-
-		do
+		while (m_running)
 		{
-			lock.lock();
-			// only wake up if we need to render or if the thread is stopped
-			m_nextTaskCondition.wait(lock, [this]{ return m_isTaskRunning || !m_running; });
-
-			if (m_task) {
-				m_task();
-				m_task = 0;
-				m_isTaskRunning = false;
+			for (int spin = 0;
+				spin < taskSpinCount && !m_isTaskRunning && m_running;
+				++spin)
+			{
+#ifdef _MSC_VER
+				YieldProcessor();
+#else
+				if ((spin & 63) == 0)
+					std::this_thread::yield();
+#endif
 			}
-			lock.unlock();
 
-		} while (m_running);
+			std::function<void()> task;
+			{
+				std::unique_lock<std::mutex> lock(m_taskMutex);
+				m_nextTaskCondition.wait(lock, [this] {
+					return m_isTaskRunning || !m_running;
+				});
+
+				if (!m_running)
+					break;
+
+				task = std::move(m_task);
+			}
+
+			if (task)
+				task();
+			m_isTaskRunning = false;
+		}
 	});
 }
 
@@ -91,7 +108,7 @@ void RenderThread::Run(std::function<void()> task)
 	{
 		std::lock_guard<std::mutex> guard(m_taskMutex);
 		m_isTaskRunning = true;
-		m_task = task;
+		m_task = std::move(task);
 	}
 	m_nextTaskCondition.notify_all();
 }

@@ -1,6 +1,134 @@
 #include "GameRenderHD.h"
 
 #include "../utilities/RendererTests.h"
+#include "../utilities/RenderProfiler.h"
+#include "../portability/GpuWorldRenderer.h"
+#include "EventsFunctions.h"
+#include "../utilities/SpriteProbe.h"
+
+namespace
+{
+	// Bridges a projected vertex of the software rasteriser to the GPU batch.
+	inline GpuWorldVertex ToGpuWorldVertex(const ProjectionPolygon& vertex)
+	{
+		GpuWorldVertex converted;
+		converted.X = vertex.X;
+		converted.Y = vertex.Y;
+		converted.U = vertex.U;
+		converted.V = vertex.V;
+		converted.Brightness = vertex.Brightness;
+		return converted;
+	}
+
+	// Terrain textures are tiles inside one shared, 256 byte wide atlas; entry 0
+	// of the address table is its origin.
+	inline uint32_t TerrainTextureOffset(const uint8_t* texture)
+	{
+		const uint8_t* atlasBase = x_DWORD_DDF50_texture_adresses.at(0);
+		if (!texture || !atlasBase || texture < atlasBase)
+		{
+			return 0;
+		}
+		return static_cast<uint32_t>(texture - atlasBase);
+	}
+
+	inline uint32_t TerrainAtlasBytes()
+	{
+		const uint32_t textureSize = x_BYTE_D41B5_texture_size;
+		return textureSize * textureSize * 256u;
+	}
+
+	// Writes the world as the player would see it: the CPU buffer, and where the
+	// GPU rasterised the world, its indices below the CPU overlay.  Both backends
+	// produce the same file layout, so the frames can be compared pixel by pixel.
+	void DumpComposedWorldFrame(uint8_t* palette, uint8_t* screenBuffer)
+	{
+		const int width = iScreenWidth_DE560;
+		const int height = static_cast<int>(screenHeight_180624);
+		if (width <= 0 || height <= 0 || !screenBuffer)
+		{
+			return;
+		}
+
+		std::vector<uint8_t> composed(
+			screenBuffer, screenBuffer + static_cast<size_t>(width) * height);
+
+		GpuWorldRenderer& gpuWorld = GpuWorldRenderer::Get();
+		const GpuWorldRenderer::CompositeInfo info = gpuWorld.GetCompositeInfo();
+		const char* backend = "software";
+
+		if (info.valid && info.targetWidth == width && info.targetHeight == height)
+		{
+			std::vector<uint8_t> worldIndices(static_cast<size_t>(width) * height);
+			if (gpuWorld.ReadbackIndexTarget(worldIndices.data(), width))
+			{
+				for (int y = info.viewportY; y < info.viewportY + info.viewportHeight; ++y)
+				{
+					for (int x = info.viewportX; x < info.viewportX + info.viewportWidth; ++x)
+					{
+						const size_t offset = static_cast<size_t>(y) * width + x;
+						if (composed[offset] == 0)
+						{
+							composed[offset] = worldIndices[offset];
+						}
+					}
+				}
+				backend = "gpu";
+			}
+		}
+
+		std::string path = GetSubDirectoryPath("BufferOut");
+		if (myaccess(path.c_str(), 0) < 0)
+		{
+			mymkdir(path.c_str());
+		}
+		path = GetSubDirectoryPath("BufferOut") + "/WorldFrame-" + backend + ".bmp";
+		BitmapIO::WriteImageBufferAsImageBMP(path.c_str(), width, height, palette, composed.data());
+
+		// The palette mapped bitmap hides which index produced a pixel, so the
+		// raw indices go next to it: with them and the shading table an offline
+		// comparison can tell a wrong texel from a wrong shade level.
+		{
+			const std::string rawPath =
+				GetSubDirectoryPath("BufferOut") + "/WorldFrame-" + backend + ".raw";
+			if (FILE* raw = fopen(rawPath.c_str(), "wb"))
+			{
+				fwrite(composed.data(), 1, composed.size(), raw);
+				fclose(raw);
+			}
+			// 0..16383 shade ramps, 16384.. destination blend table.
+			const std::string tablePath = GetSubDirectoryPath("BufferOut") + "/tablesx.raw";
+			if (FILE* table = fopen(tablePath.c_str(), "wb"))
+			{
+				fwrite(x_BYTE_F6EE0_tablesx, 1, 16384 + 65536, table);
+				fclose(table);
+			}
+		}
+		Logger->info(
+			"World frame dumped to {} ({} triangles on the GPU, {} rejected; "
+			"{} sprites on the GPU, {} rejected) [{}]",
+			path,
+			gpuWorld.GetSubmittedTriangleCount(),
+			gpuWorld.GetRejectedTriangleCount(),
+			gpuWorld.GetSubmittedSpriteCount(),
+			gpuWorld.GetRejectedSpriteCount(),
+			gpuWorld.GetModeStatistics());
+		Logger->flush();
+	}
+
+	// DrawTerrainAndParticles_3C080 has several early returns; flushing the GPU
+	// batch from a scope guard keeps every one of them correct.
+	struct ScopedGpuWorldPass
+	{
+		~ScopedGpuWorldPass()
+		{
+			GpuWorldRenderer::Get().EndWorld(
+				x_BYTE_F6EE0_tablesx,
+				x_DWORD_DDF50_texture_adresses.at(0),
+				TerrainAtlasBytes());
+		}
+	};
+}
 
 GameRenderHD::GameRenderHD(uint8_t* ptrScreenBuffer, uint8_t* pColorPalette, uint8_t renderThreads, bool assignToSpecificCores, float sizePercentToThreadRender, uint8_t viewDistanceScale) :
 	m_ptrScreenBuffer_351628(ptrScreenBuffer), m_ptrColorPalette(pColorPalette), m_assignToSpecificCores(assignToSpecificCores),
@@ -12,12 +140,29 @@ GameRenderHD::GameRenderHD(uint8_t* ptrScreenBuffer, uint8_t* pColorPalette, uin
 	m_ptrBlurBuffer_E9C3C = &m_preBlurBuffer_E9C3C[(GAME_RES_MAX_WIDTH * GAME_RES_MAX_HEIGHT)];
 
 	m_sizePercentToThreadRender = sizePercentToThreadRender;
+	ApplyViewDistanceScale(viewDistanceScale);
+}
+
+// Everything that depends on the view distance: the tile grid, its buffer and
+// the traversal step table.  Kept separate from the constructor so the scale
+// can also be changed while a level is running (F11).
+void GameRenderHD::ApplyViewDistanceScale(uint8_t viewDistanceScale)
+{
+	if (viewDistanceScale < 1)
+	{
+		viewDistanceScale = 1;
+	}
+
 	m_viewDistanceScale = viewDistanceScale;
 	m_tileRows = TILE_ROWS_COUNT * viewDistanceScale;
 	m_tileColumns = TILE_COLUMNS_COUNT * viewDistanceScale;
 
+	delete[] m_ptrStr_E9C38_smalltit;
 	m_ptrStr_E9C38_smalltit = new type_E9C38_smalltit[m_tileRows * m_tileColumns];
 
+	// BuildTileRenderStepTable refines these literals in place, so they have to
+	// be restored before every rebuild.
+	delete[] m_tileRenderStepTable_D4328x;
 	m_tileRenderStepTable_D4328x = new TileStepQuadrant[4]{
 		// Quadrant 0 (270->0)
 		{ 0xED, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xD8, 0xFF, 0x01, 0x00 },
@@ -32,6 +177,29 @@ GameRenderHD::GameRenderHD(uint8_t* ptrScreenBuffer, uint8_t* pColorPalette, uin
 	if (m_tileColumns > 40)
 	{
 		BuildTileRenderStepTable(m_tileRenderStepTable_D4328x, m_tileColumns);
+	}
+}
+
+void GameRenderHD::SetViewDistanceScale(uint8_t viewDistanceScale)
+{
+	if (viewDistanceScale == m_viewDistanceScale)
+	{
+		return;
+	}
+
+	// The worker threads walk the tile buffer that is about to be replaced.
+	const bool hadWorkers = m_renderThreads.size() > 0;
+	const uint8_t workerCount = static_cast<uint8_t>(m_renderThreads.size());
+	if (hadWorkers)
+	{
+		StopWorkerThreads();
+	}
+
+	ApplyViewDistanceScale(viewDistanceScale);
+
+	if (hadWorkers)
+	{
+		SetRenderThreads(workerCount);
 	}
 }
 
@@ -89,6 +257,7 @@ void GameRenderHD::BuildTileRenderStepTable(TileStepQuadrant* table, int cols)
 
 void GameRenderHD::DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ, int16_t pitch, int16_t roll, int16_t fov)
 {
+	ScopedRenderProfile renderProfile(RenderProfileStage::World);
 	uint16_t v8; // ax
 	int v9; // ecx
 	int v10; // ebx
@@ -331,6 +500,16 @@ void GameRenderHD::DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ
 		viewPort.SetRenderViewPortSize_BCD45(v32, 0, 0, 0);
 		x_DWORD_D4324 = 0;
 	}
+
+	// Triggered on the simulation tick, not on the render frame, so a GPU run and
+	// a software run dump exactly the same world state.
+	static bool worldFrameDumped = false;
+	const int dumpTick = CommandLineParams.GetDumpWorldFrame();
+	if (dumpTick > 0 && !worldFrameDumped && gameSimulationTick >= dumpTick)
+	{
+		worldFrameDumped = true;
+		DumpComposedWorldFrame(m_ptrColorPalette, m_ptrScreenBuffer_351628);
+	}
 }
 
 void GameRenderHD::WriteWorldToBMP()
@@ -485,6 +664,15 @@ void GameRenderHD::DrawSky_40950(int16_t roll, uint8_t startLine, uint8_t drawEv
 */
 void GameRenderHD::DrawTerrainAndParticles_3C080(__int16 posX, __int16 posY, __int16 yaw, signed int posZ, int pitch, int16_t roll, int fov)
 {
+	// Debug: --force_roll pins the camera roll for the deterministic GPU vs
+	// software comparison of the rolled render paths.  Render-only, the
+	// simulation never sees this value.
+	if (CommandLineParams.GetForceRoll() >= 0)
+	{
+		roll = static_cast<int16_t>(CommandLineParams.GetForceRoll() & 0x7FF);
+	}
+
+	ScopedRenderProfile terrainProfile(RenderProfileStage::TerrainTotal);
 	int sinIdx = 0;
 	int sinIdx2 = 0;
 	int v9; // eax
@@ -695,7 +883,18 @@ void GameRenderHD::DrawTerrainAndParticles_3C080(__int16 posX, __int16 posY, __i
 	str_F2C20ar.sin_0x0d = Maths::sin_DB750[v23];
 	str_F2C20ar.dword0x13_FogStart = ((400 * (m_viewDistanceScale * m_viewDistanceScale)) - (175 + (20 * (m_viewDistanceScale - 1)))) << 16;
 
-	if (!D41A0_0.m_GameSettings.m_Graphics.m_wSky || isCaveLevel_D41B6)
+	// The GPU can only take over the sky when it also owns this viewport;
+	// stereo / blur passes render into a private buffer and stay on the CPU.
+	const ptrdiff_t viewPortOffset =
+		ViewPortRenderBufferStart_DE558 - m_ptrScreenBuffer_351628;
+	const bool gpuOwnsViewport =
+		viewPortOffset >= 0 &&
+		viewPortOffset < static_cast<ptrdiff_t>(iScreenWidth_DE560) * screenHeight_180624;
+	const bool drawsSky = D41A0_0.m_GameSettings.m_Graphics.m_wSky && !isCaveLevel_D41B6;
+	const bool skyOnGpu =
+		gpuOwnsViewport && drawsSky && GpuWorldRenderer::Get().IsSkyEnabled();
+
+	if (!drawsSky)
 	{
 		v26 = viewPort.Width_DE564;
 		v27 = iScreenWidth_DE560 - viewPort.Width_DE564;
@@ -715,8 +914,9 @@ void GameRenderHD::DrawTerrainAndParticles_3C080(__int16 posX, __int16 posY, __i
 			v29--;
 		} while (v29);
 	}
-	else
+	else if (!skyOnGpu)
 	{
+		ScopedRenderProfile skyProfile(RenderProfileStage::Sky);
 		if (m_renderThreads.size() > 0)
 		{
 			DrawSky_40950_TH(roll);
@@ -726,6 +926,49 @@ void GameRenderHD::DrawTerrainAndParticles_3C080(__int16 posX, __int16 posY, __i
 			DrawSky_40950(roll, 0, 1);
 		}
 	}
+
+	// The sky / background fill above is the layer below the world geometry, so
+	// it becomes the initial content of the GPU index target.  From here on the
+	// software rasteriser stays out of the viewport.
+	// Stereo / blur passes render into a private buffer instead of the screen
+	// buffer; those keep using the software rasteriser.
+	if (gpuOwnsViewport)
+	{
+		GpuWorldRenderer::Get().BeginWorld(
+			m_ptrScreenBuffer_351628,
+			iScreenWidth_DE560,
+			static_cast<int>(screenHeight_180624),
+			static_cast<int>(viewPortOffset % iScreenWidth_DE560),
+			static_cast<int>(viewPortOffset / iScreenWidth_DE560),
+			viewPort.Width_DE564,
+			viewPort.Height_DE568);
+
+		if (skyOnGpu)
+		{
+			// Same constants the software loop derives, so the shader can
+			// reproduce its truncated texture walk exactly.
+			ScopedRenderProfile skyProfile(RenderProfileStage::Sky);
+			GpuSkyParams sky;
+			sky.textureSize = (x_BYTE_D41B5_texture_size == 128) ? 1024 : 256;
+			const int roundRoll = roll & 0x7FF;
+			sky.sinRoll =
+				(Maths::sin_DB750[roundRoll] * sky.textureSize) / viewPort.Width_DE564;
+			sky.cosRoll =
+				(Maths::sin_DB750[512 + roundRoll] * sky.textureSize) / viewPort.Width_DE564;
+			const int addX =
+				(-(str_F2C20ar.sin_0x0d * str_F2C20ar.dword0x22) >> 16) + str_F2C20ar.dword0x24;
+			const int addY =
+				str_F2C20ar.dword0x10 - (str_F2C20ar.cos_0x11 * str_F2C20ar.dword0x22 >> 16);
+			sky.beginX = static_cast<int32_t>(
+				(yaw_F2CC0 << 15) * (sky.textureSize / 256) -
+				(addX * sky.cosRoll - addY * sky.sinRoll));
+			sky.beginY = static_cast<int32_t>(-(sky.cosRoll * addY + sky.sinRoll * addX));
+			sky.pixels = off_D41A8_sky;
+			GpuWorldRenderer::Get().SubmitSky(sky);
+		}
+	}
+	ScopedGpuWorldPass gpuWorldPass;
+
 	//Cave Level Render
 	if (isCaveLevel_D41B6)//21d3e3 cleaned screen
 	{
@@ -1144,6 +1387,7 @@ int32_t GameRenderHD::CalculateRotationTranslationY(int64_t pnt1, int64_t sin_0x
 
 void GameRenderHD::SubDrawCaveTerrainAndParticles(std::vector<int>& projectedVertexBuffer, int pitch)
 {
+	ScopedRenderProfile terrainProfile(RenderProfileStage::TerrainCave);
 	int tileIdx_v57x = (m_tileRows * m_tileColumns) - m_tileColumns;
 	int tileColIdx_v58; // ah
 	int jx;
@@ -1373,6 +1617,7 @@ void GameRenderHD::SubDrawCaveTerrainAndParticles(std::vector<int>& projectedVer
 
 void GameRenderHD::SubDrawInverseTerrainAndParticles(std::vector<int>& projectedVertexBuffer, int pitch)
 {
+	ScopedRenderProfile terrainProfile(RenderProfileStage::TerrainInverse);
 	int v25z;
 	int v133x = (m_tileRows * m_tileColumns) - m_tileColumns;
 	int v134x;
@@ -1542,6 +1787,7 @@ void GameRenderHD::SubDrawInverseTerrainAndParticles(std::vector<int>& projected
 
 void GameRenderHD::SubDrawTerrainAndParticles(std::vector<int>& projectedVertexBuffer, int pitch)
 {
+	ScopedRenderProfile terrainProfile(RenderProfileStage::TerrainNormal);
 	int tileIdx_v160 = (m_tileRows * m_tileColumns) - m_tileColumns;
 
 	int v161;
@@ -2963,71 +3209,87 @@ void GameRenderHD::DrawSquareInProjectionSpace(std::vector<int>& vertexs, int in
 
 	auto skipThread = CheckIfThreadRenderTriangle(vertex0, vertex6, vertex12, vertex18);
 
-	if ((uint8_t)m_ptrStr_E9C38_smalltit[index].triangleFeatures_38 & 1)
+	const bool alternateDiagonal =
+		(static_cast<uint8_t>(m_ptrStr_E9C38_smalltit[index].triangleFeatures_38) & 1) != 0;
+
+	GpuWorldRenderer& gpuWorld = GpuWorldRenderer::Get();
+	if (gpuWorld.IsCapturing())
 	{
-		if (m_renderThreads.size() > 0 && !skipThread)
+		const uint32_t textureOffset = TerrainTextureOffset(x_DWORD_DE55C_ActTexture);
+		const uint8_t mode = static_cast<uint8_t>(x_BYTE_E126D);
+		const uint8_t shade = static_cast<uint8_t>(x_BYTE_E126C);
+		if (alternateDiagonal)
 		{
-			uint8_t i = 0;
-
-			for (i = 0; i < m_renderThreads.size(); i++)
-			{
-				m_renderThreads[i]->Run([this, vertex0, vertex6, vertex12, vertex18, i, drawEveryNthLine] {
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex0, i, drawEveryNthLine);
-					this->DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex12, &vertex6, i, drawEveryNthLine);
-					});
-			}
-
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex0, i, drawEveryNthLine);
-			this->DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex12, &vertex6, i, drawEveryNthLine);
-
-			WaitForRenderFinish();
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex12), ToGpuWorldVertex(vertex0),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex0), ToGpuWorldVertex(vertex12), ToGpuWorldVertex(vertex6),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
 		}
 		else
 		{
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex0, 0, 1);
-			DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex12, &vertex6, 0, 1);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex12), ToGpuWorldVertex(vertex6),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex6), ToGpuWorldVertex(vertex0),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
 		}
+		return;
+	}
+
+	auto drawLines = [this, &vertex0, &vertex6, &vertex12, &vertex18, alternateDiagonal](
+		uint8_t startLine, uint8_t lineStep)
+	{
+		if (alternateDiagonal)
+		{
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex0, startLine, lineStep);
+			DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex12, &vertex6, startLine, lineStep);
+		}
+		else
+		{
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex6, startLine, lineStep);
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex0, startLine, lineStep);
+		}
+	};
+
+	if (!m_renderThreads.empty() && !skipThread)
+	{
+		uint8_t line = 0;
+		for (; line < m_renderThreads.size(); ++line)
+		{
+			m_renderThreads[line]->Run([&drawLines, line, drawEveryNthLine] {
+				drawLines(line, drawEveryNthLine);
+			});
+		}
+
+		drawLines(line, drawEveryNthLine);
+		WaitForRenderFinish();
 	}
 	else
 	{
-		if (m_renderThreads.size() > 0 && !skipThread)
-		{
-			uint8_t i = 0;
-
-			for (i = 0; i < m_renderThreads.size(); i++)
-			{
-				m_renderThreads[i]->Run([this, vertex0, vertex6, vertex12, vertex18, i, drawEveryNthLine] {
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex6, i, drawEveryNthLine);
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex0, i, drawEveryNthLine);
-					});
-			}
-
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex6, i, drawEveryNthLine);
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex0, i, drawEveryNthLine);
-
-			WaitForRenderFinish();
-		}
-		else
-		{
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex12, &vertex6, 0, 1);
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex0, 0, 1);
-		}
+		drawLines(0, 1);
 	}
 }
 
 bool GameRenderHD::CheckIfThreadRenderTriangle(ProjectionPolygon v1, ProjectionPolygon v2, ProjectionPolygon v3, ProjectionPolygon v4)
 {
-	double triArea1 = std::abs(v4.X * (v3.Y - v1.Y) + v3.X * (v1.Y - v4.Y) + v1.X * (v4.Y - v3.Y)) / 2.0;
-	double triArea2 = std::abs(v2.X * (v3.Y - v1.Y) + v3.X * (v1.Y - v2.Y) + v1.X * (v2.Y - v3.Y)) / 2.0;
+	const int64_t doubleArea1 = std::abs(
+		static_cast<int64_t>(v4.X) * (v3.Y - v1.Y) +
+		static_cast<int64_t>(v3.X) * (v1.Y - v4.Y) +
+		static_cast<int64_t>(v1.X) * (v4.Y - v3.Y));
+	const int64_t doubleArea2 = std::abs(
+		static_cast<int64_t>(v2.X) * (v3.Y - v1.Y) +
+		static_cast<int64_t>(v3.X) * (v1.Y - v2.Y) +
+		static_cast<int64_t>(v1.X) * (v2.Y - v3.Y));
+	const double minimumDoubleArea =
+		static_cast<double>(viewPort.Width_DE564) *
+		static_cast<double>(viewPort.Height_DE568) *
+		static_cast<double>(m_sizePercentToThreadRender) / 50.0;
 
-	double viewPortArea = viewPort.Width_DE564 * viewPort.Height_DE568;
-
-	bool skipThread = (triArea1 / viewPortArea) * 100 < m_sizePercentToThreadRender;
-
-	if (!skipThread)
-		skipThread = (triArea2 / viewPortArea) * 100 < m_sizePercentToThreadRender;
-
-	return skipThread;
+	return static_cast<double>(doubleArea1) < minimumDoubleArea ||
+		static_cast<double>(doubleArea2) < minimumDoubleArea;
 }
 
 bool GameRenderHD::CheckViewPortCull(ProjectionPolygon v1, ProjectionPolygon v2, ProjectionPolygon v3, int maxCoordinate, int minCoordinate)
@@ -3085,56 +3347,66 @@ void GameRenderHD::DrawInverseSquareInProjectionSpace(int* vertexs, int index, u
 
 	auto skipThread = CheckIfThreadRenderTriangle(vertex0, vertex6, vertex12, vertex18);
 
-	if (m_ptrStr_E9C38_smalltit[index].triangleFeatures_38 & 1)
+	const bool alternateDiagonal = (m_ptrStr_E9C38_smalltit[index].triangleFeatures_38 & 1) != 0;
+
+	GpuWorldRenderer& gpuWorld = GpuWorldRenderer::Get();
+	if (gpuWorld.IsCapturing())
 	{
-		if (m_renderThreads.size() > 0 && !skipThread)
+		const uint32_t textureOffset = TerrainTextureOffset(pTexture);
+		const uint8_t mode = static_cast<uint8_t>(x_BYTE_E126D);
+		const uint8_t shade = static_cast<uint8_t>(x_BYTE_E126C);
+		if (alternateDiagonal)
 		{
-			uint8_t i = 0;
-
-			for (i = 0; i < m_renderThreads.size(); i++)
-			{
-				m_renderThreads[i]->Run([this, vertex0, vertex6, vertex12, vertex18, i, drawEveryNthLine] {
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex12, i, drawEveryNthLine);
-					this->DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex6, &vertex12, i, drawEveryNthLine);
-					});
-			}
-
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex12, i, drawEveryNthLine);
-			this->DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex6, &vertex12, i, drawEveryNthLine);
-
-			WaitForRenderFinish();
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex0), ToGpuWorldVertex(vertex12),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex0), ToGpuWorldVertex(vertex6), ToGpuWorldVertex(vertex12),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
 		}
 		else
 		{
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex12, 0, 1);
-			DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex6, &vertex12, 0, 1);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex6), ToGpuWorldVertex(vertex12),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
+			gpuWorld.SubmitTriangle(
+				ToGpuWorldVertex(vertex18), ToGpuWorldVertex(vertex0), ToGpuWorldVertex(vertex6),
+				textureOffset, mode, shade, x_BYTE_D41B5_texture_size);
+		}
+		return;
+	}
+
+	auto drawLines = [this, &vertex0, &vertex6, &vertex12, &vertex18, alternateDiagonal](
+		uint8_t startLine, uint8_t lineStep)
+	{
+		if (alternateDiagonal)
+		{
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex12, startLine, lineStep);
+			DrawTriangleInProjectionSpace_B6253(&vertex0, &vertex6, &vertex12, startLine, lineStep);
+		}
+		else
+		{
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex12, startLine, lineStep);
+			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex6, startLine, lineStep);
+		}
+	};
+
+	if (!m_renderThreads.empty() && !skipThread)
+	{
+		uint8_t line = 0;
+		for (; line < m_renderThreads.size(); ++line)
+		{
+			m_renderThreads[line]->Run([&drawLines, line, drawEveryNthLine] {
+				drawLines(line, drawEveryNthLine);
+			});
 		}
 
+		drawLines(line, drawEveryNthLine);
+		WaitForRenderFinish();
 	}
 	else
 	{
-		if (m_renderThreads.size() > 0 && !skipThread)
-		{
-			uint8_t i = 0;
-
-			for (i = 0; i < m_renderThreads.size(); i++)
-			{
-				m_renderThreads[i]->Run([this, vertex0, vertex6, vertex12, vertex18, i, drawEveryNthLine] {
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex12, i, drawEveryNthLine);
-					this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex6, i, drawEveryNthLine);
-					});
-			}
-
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex12, i, drawEveryNthLine);
-			this->DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex6, i, drawEveryNthLine);
-
-			WaitForRenderFinish();
-		}
-		else
-		{
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex6, &vertex12, 0, 1);
-			DrawTriangleInProjectionSpace_B6253(&vertex18, &vertex0, &vertex6, 0, 1);
-		}
+		drawLines(0, 1);
 	}
 }
 
@@ -3898,8 +4170,248 @@ void GameRenderHD::DrawSprites_3E360(int a2x, type_particle_str** str_DWORD_F66F
 	} while (result);
 }
 
+// Hands the current world sprite of DrawSprite_41BD3 to the GPU renderer.
+// The eight octant cases of the CPU blit are a two-shear DDA decomposition of
+// ONE rotation by the camera roll; with S = sin_0x0d, C = cos_0x11 (sin/cos
+// of the roll, 16.16) the destination is the parallelogram
+//   column(u,v) = screenY + u*C + v*S
+//   row(u,v)    = screenX - u*S + v*C      (u in [0,realWidth], v in [0,realHeight])
+// which is exactly what both anchor corrections invert (a1==1 bottom centre,
+// a1==0/2 centre; screenX is the destination ROW, screenY the COLUMN - see
+// work/SPRITE-PORT-HANDOVER.md).  Destination reading pixel modes (2, 3, 6,
+// 7, 8) and big sprites (x_BYTE_F2CC6) keep the CPU blit and are counted as
+// rejected.  Returns true when the CPU blit must not run (sprite submitted,
+// or it would not have drawn anything anyway).
+static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
+{
+	GpuWorldRenderer& gpu = GpuWorldRenderer::Get();
+	if (!gpu.IsCapturing() || !gpu.AreSpritesEnabled())
+	{
+		return false;
+	}
+
+	const int mode = str_F2C20ar.dword0x01_rotIdx;
+	if (mode < 0 || mode > 8)
+	{
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7 || mode == 8) &&
+		!gpu.SupportsDestinationReads())
+	{
+		// Destination reading modes need the rasterizer ordered view.
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+
+	int constant = 0;
+	if (mode == 1 || mode == 6 || mode == 7 || mode == 8)
+	{
+		// tablesx[dword0x00 | ...]; dword0x00 is the shade level << 8.
+		if (str_F2C20ar.dword0x00 & ~0xFFFF)
+		{
+			gpu.NoteSpriteRejected();
+			return false;
+		}
+		constant = (str_F2C20ar.dword0x00 >> 8) & 0xFF;
+	}
+	else if (mode == 4 || mode == 5)
+	{
+		// Player colour remap through the blend table.
+		if (str_F2C20ar.dword0x07 & ~0xFFFF)
+		{
+			gpu.NoteSpriteRejected();
+			return false;
+		}
+		constant = str_F2C20ar.dword0x07 & 0xFF;
+	}
+
+	// With cos == 1.0 the octant 0 blit uses realWidth columns (v156) and
+	// realHeight rows (scaledHeight) unchanged.
+	const int realWidth = str_F2C20ar.dword0x09_realWidth;
+	const int realHeight = str_F2C20ar.dword0x0c_realHeight;
+	if (realWidth <= 0 || realHeight <= 0)
+	{
+		return true; // the CPU blit would draw nothing either
+	}
+
+	const int sourceWidth = str_F2C20ar.dword0x08_width;
+	const int sourceHeight = str_F2C20ar.dword0x06_height;
+	const int span = str_F2C20ar.dword0x05; // signed source width (mirror)
+	if (sourceWidth <= 0 || sourceHeight <= 0 || !str_F2C20ar.dword0x02_data ||
+		span == 0 || span > sourceWidth || span < -sourceWidth)
+	{
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+
+	// Affine source mapping (texels per sprite axis unit); anchor modes 0 and
+	// 2 walk the source rows backwards, negative span mirrors horizontally.
+	// The start values match the CPU DDA (0 / |span| - step, 0 / height - step).
+	const float w = static_cast<float>(realWidth);
+	const float h = static_cast<float>(realHeight);
+	const float uPerUnit = static_cast<float>(span) / w;
+	const float uStart = span < 0
+		? static_cast<float>(-span) + uPerUnit
+		: 0.0f;
+	const float vPerUnit = anchorMode == 1
+		? static_cast<float>(sourceHeight) / h
+		: -static_cast<float>(sourceHeight) / h;
+	const float vStart = anchorMode == 1
+		? 0.0f
+		: static_cast<float>(sourceHeight) + vPerUnit;
+
+	const float sinRoll = static_cast<float>(str_F2C20ar.sin_0x0d) / 65536.0f;
+	const float cosRoll = static_cast<float>(str_F2C20ar.cos_0x11) / 65536.0f;
+
+	// The GPU samples at pixel centres: with u(x,y) = (x-bx)*C - (y-by)*S and
+	// v(x,y) = (x-bx)*S + (y-by)*C the centre offset (0.5, 0.5) adds
+	// 0.5*(C-S) sprite units to u and 0.5*(S+C) to v, which the edge values
+	// compensate.  The small positive bias keeps floor() stable when a sample
+	// lands exactly on a texel boundary (1:1 scale); overshoot beyond the
+	// bitmap hits the replicated atlas border, which holds the same texel the
+	// CPU would have read.
+	constexpr float boundaryBias = 512.0f / 65536.0f;
+	GpuSpriteQuad quad;
+	const float baseX = static_cast<float>(str_F2C20ar.dword0x04_screenY); // column
+	const float baseY = static_cast<float>(str_F2C20ar.dword0x03_screenX); // row
+	quad.cornerX[0] = baseX;                                // P00
+	quad.cornerY[0] = baseY;
+	quad.cornerX[1] = baseX + w * cosRoll;                  // P10 (u axis)
+	quad.cornerY[1] = baseY - w * sinRoll;
+	quad.cornerX[2] = baseX + w * cosRoll + h * sinRoll;    // P11
+	quad.cornerY[2] = baseY - w * sinRoll + h * cosRoll;
+	quad.cornerX[3] = baseX + h * sinRoll;                  // P01 (v axis)
+	quad.cornerY[3] = baseY + h * cosRoll;
+	quad.u0 = uStart - 0.5f * uPerUnit * (cosRoll - sinRoll) + boundaryBias;
+	quad.u1 = quad.u0 + uPerUnit * w;
+	quad.v0 = vStart - 0.5f * vPerUnit * (sinRoll + cosRoll) + boundaryBias;
+	quad.v1 = quad.v0 + vPerUnit * h;
+	quad.pixels = reinterpret_cast<const uint8_t*>(str_F2C20ar.dword0x02_data);
+	quad.width = sourceWidth;
+	quad.height = sourceHeight;
+	quad.mode = static_cast<uint8_t>(mode);
+	quad.constant = static_cast<uint8_t>(constant);
+	return gpu.SubmitSprite(quad);
+}
+
+// Same for the x_BYTE_F2CC6 blit at the end of DrawSprite_41BD3 (the big
+// "fair animation" sprites, entity types 22..36): an axis aligned rectangle
+// that ignores the camera roll, walks the source rows top-down for every
+// anchor mode and never mirrors.  Called after the v138 anchor shifts, so
+// screenX/screenY in the struct are final (row/column as usual).  Returns
+// true when the CPU blit must not run.
+static bool TrySubmitBigWorldSpriteToGpu()
+{
+	GpuWorldRenderer& gpu = GpuWorldRenderer::Get();
+	if (!gpu.IsCapturing() || !gpu.AreSpritesEnabled())
+	{
+		return false;
+	}
+
+	const int mode = str_F2C20ar.dword0x01_rotIdx;
+	if (mode < 0 || mode > 7)
+	{
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7) &&
+		!gpu.SupportsDestinationReads())
+	{
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+
+	int constant = 0;
+	if (mode == 1 || mode == 6 || mode == 7)
+	{
+		if (str_F2C20ar.dword0x00 & ~0xFFFF)
+		{
+			gpu.NoteSpriteRejected();
+			return false;
+		}
+		constant = (str_F2C20ar.dword0x00 >> 8) & 0xFF;
+	}
+	else if (mode == 4 || mode == 5)
+	{
+		if (str_F2C20ar.dword0x07 & ~0xFFFF)
+		{
+			gpu.NoteSpriteRejected();
+			return false;
+		}
+		constant = str_F2C20ar.dword0x07 & 0xFF;
+	}
+
+	const int realWidth = str_F2C20ar.dword0x09_realWidth;
+	const int realHeight = str_F2C20ar.dword0x0c_realHeight;
+	if (realWidth <= 0 || realHeight <= 0)
+	{
+		return true; // the CPU blit would draw nothing either
+	}
+
+	const int sourceWidth = str_F2C20ar.dword0x08_width;
+	const int sourceHeight = str_F2C20ar.dword0x06_height;
+	const int span = str_F2C20ar.dword0x05;
+	// This path has no mirror start correction, so a negative span would read
+	// backwards out of the row - keep such sprites (if they exist) on the CPU.
+	if (sourceWidth <= 0 || sourceHeight <= 0 || !str_F2C20ar.dword0x02_data ||
+		span <= 0 || span > sourceWidth)
+	{
+		gpu.NoteSpriteRejected();
+		return false;
+	}
+
+	const float w = static_cast<float>(realWidth);
+	const float h = static_cast<float>(realHeight);
+	const float uPerUnit = static_cast<float>(span) / w;
+	const float vPerUnit = static_cast<float>(sourceHeight) / h;
+
+	constexpr float boundaryBias = 512.0f / 65536.0f;
+	GpuSpriteQuad quad;
+	const float baseX = static_cast<float>(str_F2C20ar.dword0x04_screenY); // column
+	const float baseY = static_cast<float>(str_F2C20ar.dword0x03_screenX); // row
+	quad.cornerX[0] = baseX;
+	quad.cornerY[0] = baseY;
+	quad.cornerX[1] = baseX + w;
+	quad.cornerY[1] = baseY;
+	quad.cornerX[2] = baseX + w;
+	quad.cornerY[2] = baseY + h;
+	quad.cornerX[3] = baseX;
+	quad.cornerY[3] = baseY + h;
+	quad.u0 = -0.5f * uPerUnit + boundaryBias;
+	quad.u1 = quad.u0 + uPerUnit * w;
+	quad.v0 = -0.5f * vPerUnit + boundaryBias;
+	quad.v1 = quad.v0 + vPerUnit * h;
+	quad.pixels = reinterpret_cast<const uint8_t*>(str_F2C20ar.dword0x02_data);
+	quad.width = sourceWidth;
+	quad.height = sourceHeight;
+	quad.mode = static_cast<uint8_t>(mode);
+	quad.constant = static_cast<uint8_t>(constant);
+	return gpu.SubmitSprite(quad);
+}
+
 void GameRenderHD::DrawSprite_41BD3(uint32 a1)
 {
+	// Measures the destination footprint of this blit without changing it.
+	// The guard covers every early return of the function.
+	struct ScopedSpriteProbe
+	{
+		uint32_t anchorMode;
+		const uint8_t* buffer;
+		bool held;
+		explicit ScopedSpriteProbe(uint32_t mode, const uint8_t* screenBuffer)
+			: anchorMode(mode), buffer(screenBuffer), held(false)
+		{
+			if (SpriteProbe::IsActive())
+				held = SpriteProbe::Begin(str_F2C20ar, anchorMode, buffer);
+		}
+		~ScopedSpriteProbe()
+		{
+			if (held)
+				SpriteProbe::End(str_F2C20ar, anchorMode, buffer);
+		}
+	} spriteProbe(a1, m_ptrScreenBuffer_351628);
+
 	int8_t* ptrSpriteRenderSrc_v2x; // ebx
 	x_DWORD* v3; // esi
 	uint8_t* v4; // edi
@@ -4106,7 +4618,10 @@ void GameRenderHD::DrawSprite_41BD3(uint32 a1)
 			if (a1 != 2)//a1 == 0,1
 			{
 			LABEL_126:
-				if ((unsigned int)str_F2C20ar.dword0x1e <= 7)
+				// GPU world sprites: when the renderer takes the sprite the
+				// whole CPU blit is skipped and control continues after the
+				// switch, exactly like a case break.
+				if ((unsigned int)str_F2C20ar.dword0x1e <= 7 && !TrySubmitWorldSpriteToGpu(a1))
 				{
 					switch (str_F2C20ar.dword0x1e)//mirroring
 					{
@@ -5047,6 +5562,19 @@ void GameRenderHD::DrawSprite_41BD3(uint32 a1)
 			str_F2C20ar.dword0x04_screenY += (str_F2C20ar.sin_0x0d * v138 >> 16) - v138;
 			str_F2C20ar.dword0x03_screenX += (str_F2C20ar.cos_0x11 * v138 >> 16) - v138;
 		}
+	}
+	// GPU world sprites: the big sprite blit joins the terrain vertex stream
+	// too; anchors are already applied, the viewport clip below is what the
+	// GPU viewport does anyway.  The help marker overlay still has to be
+	// drawn by the CPU (it is UI, not world).
+	if (TrySubmitBigWorldSpriteToGpu())
+	{
+		if (a1 == 1 && x_D41A0_BYTEARRAY_4_struct.showHelp_10)
+			sub_88740(
+				str_F2C20ar.dword0x14x,
+				(int16_t)(str_F2C20ar.dword0x04_screenY + (str_F2C20ar.dword0x09_realWidth >> 1)),
+				(int16_t)(str_F2C20ar.dword0x03_screenX + (str_F2C20ar.dword0x0c_realHeight >> 1)));
+		return;
 	}
 	if ((uint16_t)viewPort.Width_DE564 > str_F2C20ar.dword0x04_screenY)
 	{

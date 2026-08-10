@@ -38,6 +38,7 @@
 #endif //__linux__
 
 
+#include <chrono>
 #include <filesystem>
 
 int test_regression_level = 1;
@@ -31580,6 +31581,85 @@ void sub_46F50_sound_proc7()//227f50
 int debug_first_run = 0;
 int debugcounter_228320 = 0;
 
+namespace
+{
+	class FixedSimulationScheduler
+	{
+	public:
+		void Reset(int targetFps)
+		{
+			const int safeTargetFps = targetFps > 0 ? targetFps : 24;
+			m_step = std::chrono::duration<double>(1.0 / safeTargetFps);
+			m_accumulator = m_step; // Preserve the old immediate first game tick.
+			m_lastFrame = std::chrono::steady_clock::now();
+			m_profileStart = m_lastFrame;
+			m_profileRenderFrames = 0;
+			m_profileSimulationSteps = 0;
+		}
+
+		int ConsumeSteps(bool profile)
+		{
+			const auto now = std::chrono::steady_clock::now();
+			auto elapsed = std::chrono::duration<double>(now - m_lastFrame);
+			m_lastFrame = now;
+
+			// Avoid a long pause or debugger stop causing an unbounded catch-up spiral.
+			const std::chrono::duration<double> maxElapsed(0.25);
+			if (elapsed > maxElapsed)
+				elapsed = maxElapsed;
+			m_accumulator += elapsed;
+
+			constexpr int maxCatchUpSteps = 6;
+			int steps = 0;
+			while (m_accumulator >= m_step && steps < maxCatchUpSteps)
+			{
+				m_accumulator -= m_step;
+				++steps;
+			}
+			if (steps == maxCatchUpSteps && m_accumulator >= m_step)
+				m_accumulator = std::chrono::duration<double>::zero();
+
+			if (profile)
+			{
+				++m_profileRenderFrames;
+				m_profileSimulationSteps += steps;
+				const auto profileElapsed = std::chrono::duration<double>(now - m_profileStart);
+				if (profileElapsed.count() >= 1.0)
+				{
+					Logger->info(
+						"Timing: render {:.1f} FPS, simulation {:.1f} ticks/s",
+						m_profileRenderFrames / profileElapsed.count(),
+						m_profileSimulationSteps / profileElapsed.count());
+					m_profileStart = now;
+					m_profileRenderFrames = 0;
+					m_profileSimulationSteps = 0;
+				}
+			}
+
+			return steps;
+		}
+
+	private:
+		std::chrono::steady_clock::time_point m_lastFrame{};
+		std::chrono::steady_clock::time_point m_profileStart{};
+		std::chrono::duration<double> m_step{ 1.0 / 24.0 };
+		std::chrono::duration<double> m_accumulator{ 0.0 };
+		int m_profileRenderFrames = 0;
+		int m_profileSimulationSteps = 0;
+	};
+
+	FixedSimulationScheduler gameSimulationScheduler;
+
+	bool UseFixedSimulationScheduler()
+	{
+		// Regression and renderer tests advance exactly one deterministic game turn
+		// per test frame, independent of host timing.
+		return CommandLineParams.ModeRegressionsTestType() == -1
+			&& !CommandLineParams.DoTestRegression()
+			&& !CommandLineParams.DoTestRenderers();
+	}
+}
+
 //----- (00047320) --------------------------------------------------------
 void InGameLoop_47320()//228320
 {
@@ -31621,6 +31701,8 @@ void InGameLoop_47320()//228320
 	//fix res on begin level for hidden levels-neoriginal code
 
 	EventDispatcher::I->DispatchEvent(EventType::E_GAME_STATE_CHANGE, GameState::STARTED);
+	const bool useFixedSimulationScheduler = UseFixedSimulationScheduler();
+	gameSimulationScheduler.Reset(simulationFps);
 
 	while (1)
 	{
@@ -31660,7 +31742,10 @@ void InGameLoop_47320()//228320
 		//x_DWORD_DDF50_texture_adresses
 		//savetext
 		*/
-		DrawAndEventsInGame_47560(GameTimerTurn_17DB54);
+		const int simulationSteps = useFixedSimulationScheduler
+			? gameSimulationScheduler.ConsumeSteps(CommandLineParams.DoProfileRenderer())
+			: 1;
+		DrawAndEventsInGame_47560(GameTimerTurn_17DB54, simulationSteps);
 		if (gameTurn < 2)
 		{
 			StopMusic_8E020();
@@ -31728,9 +31813,14 @@ void intervalsave(int index) {
 
 //long debugcounter_47560_2=0;
 //----- (00047560) --------------------------------------------------------
-void DrawAndEventsInGame_47560(int16_t turn)//228560
+int64_t gameSimulationTick = 0;
+
+void DrawAndEventsInGame_47560(int16_t turn, int simulationSteps)//228560
 {
 	SetFrameStart(std::chrono::system_clock::now());
+	for (int simulationStep = 0; simulationStep < simulationSteps; ++simulationStep)
+	{
+	++gameSimulationTick;
 	if ((CommandLineParams.ModeRegressionsTestType() != -1) && (count_begin == 1))
 		debugcounter_47560++;
 	PaletteChanges_47760();
@@ -31827,6 +31917,7 @@ void DrawAndEventsInGame_47560(int16_t turn)//228560
 		sub_57570();//nothing draw
 	sub_575C0();//nothing draw
 	PlayEntitySounds_6E150();//nothing draw
+	}
 	DrawGameFrame_2BE30();
 	//adress 2285ff
 	//add_compare(0x002285FF, CommandLineParams.DoDebugafterload());
