@@ -1,8 +1,31 @@
-# Magic Carpet 2 HD
-Based off the Reverse engineering of game Magic Carpet 2 from assembler to c/c++ language by Tomas Versly <br />
-Forked from Tomas Vesely's repo here: https://github.com/turican0/remc2
+# Magic Carpet 2 HD - Reloaded fork 1.0
+
+A fork of **Magic Carpet 2 HD** that moves the world renderer from the CPU to
+the GPU (Direct3D 11) while reproducing the original software renderer pixel
+for pixel.
+
+Lineage of this work:
+
+* **Bullfrog Productions** wrote Magic Carpet 2 (1995).
+* **Tomas Vesely** reverse engineered it from assembler to C/C++: https://github.com/turican0/remc2
+* **thobbsinteractive and contributors** turned that into Magic Carpet 2 HD - resolution support, modern controls, sound, installer, multiplayer: https://github.com/thobbsinteractive/magic-carpet-2-hd
+* This fork adds the GPU renderer on top.
+
+None of this would exist without the work above. See [Credits](#credits).
 
 ### find us on Discord here: https://discord.gg/GR55HCbJJ4 ###
+
+## New in this fork ##
+- **Direct3D 11 world renderer** - terrain, world sprites and sky rasterised on the GPU
+- **Exact draw order** between terrain and sprites, so nothing floats in front of geometry it should be hidden behind
+- **Exact destination blending** (translucent water, shadows) via rasterizer ordered views
+- **Roughly 30x less CPU time per world frame**, e.g. 11.85 ms -> 0.40 ms at 1280x720
+- **View distance up to 4x**, switchable in game
+- **Frame rate counter**, switchable in game
+- Every stage sits behind its own feature flag; with all of them off you get the unchanged software renderer
+
+Technical documentation, measurements and known limitations:
+[docs/GPU-RENDERER.md](docs/GPU-RENDERER.md)
 
 ## Current Features ##
 - **Support for HD, 2k and even 4k gameplay**
@@ -16,6 +39,36 @@ https://github.com/thobbsinteractive/magic-carpet-2-hd/releases/latest
 ## Install Guide for GOG Edition or from Magic Carpet CD ##
 https://github.com/thobbsinteractive/magic-carpet-2-hd/wiki/Windows-Installation-Guide
 
+## Installing this fork ##
+**You need your own copy of Magic Carpet 2.** No game data is contained in this
+repository and none will ever be - the GOG edition or an original CD is
+required.
+
+1. Install Magic Carpet 2 HD first, using the installer and guide linked above.
+   That sets up the game data, the configurator and everything else.
+2. Build this fork (see [Build](#build)) or take `remc2.exe` from a release of
+   this repository.
+3. Replace the `remc2.exe` of your Magic Carpet 2 HD installation with it.
+4. Enable the GPU renderer in `config.json` under `graphics`:
+
+```json
+"gpuPalettePresentation": true,
+"gpuWorldGeometry": true,
+"gpuSprites": true,
+"gpuSky": true
+```
+
+`gpuExactBlend` defaults to on. If your GPU has no support for rasterizer
+ordered views the renderer says so in the log and falls back automatically, so
+the flag is safe to leave alone.
+
+Requirements: Windows with Direct3D 11. `gpuSky` and the exact blend modes need
+feature level 11_1 hardware, which in practice means anything from roughly 2013
+onwards. Without it the other stages still work.
+
+To go back to the original software renderer at any time, set all `gpu*` flags
+to `false`.
+
 # Controls #
 Controls can be redefined in the Configurator/Config.json file, however here are the defaults:
 </br>
@@ -25,6 +78,11 @@ Move Left = A</br>
 Move Right = D</br>
 Open Spell Menu = LCtrl / Mouse 4</br>
 Open Map = Tab / Middle Mouse</br>
+</br>
+Graphics options, all with Shift held:</br>
+Shift+F1 = Reflections, Shift+F2 = Sky, Shift+F3 = Shadows, Shift+F4 = Light sources</br>
+Shift+F11 = Cycle view distance (1x to 4x)</br>
+Shift+F12 = Frame rate counter</br>
 
 # Community links #
 - **Magic Balls:** A project that uses the same engine but renders the image via the Godot engine: https://github.com/turican0/MagicBalls<br>
@@ -185,9 +243,42 @@ e.g. `void sub_19CA0_sound_proc5(unsigned __int8 a1)` was renamed to `void Chang
 ## MILESTONE 5 ##
 - [ ] Get Magic Carpet 1 working using this engine. Ideally with original music and graphics.
 
+## GPU RENDERER (this fork) ##
+- [x] Palette resolve and upscaling on the GPU
+- [x] Terrain and world polygons on the GPU, one draw call per frame
+- [x] World sprites on the GPU, draw order exact against the terrain
+- [x] Exact destination blending through rasterizer ordered views
+- [x] Sky on the GPU
+- [x] View distance up to 4x, switchable in game
+- [ ] Explosions and particles with real alpha blending instead of the sprite path
+- [ ] Minimap markers scaled with the UI
+- [ ] Emulate the per scanline DDA to remove the last sub-pixel sampling offset
+- [ ] Linux/Vulkan or OpenGL backend alongside the D3D11 one
+
 ## LONG TERM GOALS ##
 - Add VR support back into the game (yes it was originally supported! This game was waaay ahead of its time)<br />
 - Implement online multiplayer match making
+
+# Credits #
+
+This fork stands entirely on other people's work.
+
+- **Bullfrog Productions** - Magic Carpet 2: The Netherworlds (1995), the game itself.
+- **Tomas Vesely** ([turican0](https://github.com/turican0)) - reverse engineered the
+  original from assembler into C/C++ in [remc2](https://github.com/turican0/remc2).
+  Without that there is nothing to build on. His decompiled rasteriser is also
+  what the GPU renderer in this fork is verified against, pixel by pixel.
+- **thobbsinteractive** and the contributors to
+  [magic-carpet-2-hd](https://github.com/thobbsinteractive/magic-carpet-2-hd) -
+  resolution support, modern controls, controller support, sound and music work,
+  the configurator, the installer and LAN multiplayer. This fork branches from
+  their work and follows their code style and conventions.
+- **Moburma** - documentation of cut levels, level data structures and missing
+  graphics at [TCRF](https://tcrf.net/Magic_Carpet_2:_The_Netherworlds).
+- The **remc2 and Magic Carpet 2 HD community** on
+  [Discord](https://discord.gg/GR55HCbJJ4).
+
+Bug reports about the GPU renderer belong in this fork, not upstream.
 
 # License #
 ## Original Source Code is Copyright 1995 Bullfrog Productions ##
