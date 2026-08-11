@@ -386,14 +386,46 @@ void GameRenderHD::DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ
 						if (D41A0_0.m_GameSettings.m_Graphics.m_wViewPortSize == 40)
 						{
 							v34 = Entities_EA3E4[D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].playerIndex_0x00a_2BE4_11240]->actSpeed_0x82_130;
-							if ((signed int)((HIDWORD(v34) ^ v34) - HIDWORD(v34)) > 80)
+							// --force_blur turns the high speed blur on without
+							// having to reach that speed, so its cost can be
+							// measured deterministically.
+							if ((signed int)((HIDWORD(v34) ^ v34) - HIDWORD(v34)) > 80 ||
+								CommandLineParams.DoForceBlur())
 								D41A0_0.m_GameSettings.m_Display.xxxx_0x2191 = 1;
 						}
 					}
 				}
 			}
 		}
-		if (D41A0_0.str_0x21AE.xxxx_0x21B1 && D41A0_0.m_GameSettings.m_Display.xxxx_0x2191 && m_ptrBlurBuffer_E9C3C)
+		// --force_blur reproduces the exact state the exit warp puts the game in.
+		// Both values matter and both come from the warp event itself (see the
+		// level end case in EventsFunctions): xxxx_0x21B1 is what enables the
+		// blend at all, and xxxx_0x2191 == 2 - not 1 - selects the blend variant
+		// the warp uses.  Forcing only xxxx_0x2191 leaves the gate below closed,
+		// so the pass never runs and the effect appears to be missing.
+		if (CommandLineParams.DoForceBlur())
+		{
+			D41A0_0.str_0x21AE.xxxx_0x21B1 = 1;
+			D41A0_0.m_GameSettings.m_Display.xxxx_0x2191 = 2;
+		}
+
+		// The exit warp.  The world is rendered into the blur buffer, that
+		// buffer is blended against the screen - which still shows the previous
+		// frame - and the loop below leaves DrawWorld through the jump at its
+		// end, so the normal world pass never runs.  The blended image is the
+		// frame, which is why the effect only shows while the camera moves: a
+		// still camera blends two identical images.
+		//
+		// The cost follows from the same structure.  The one world pass targets
+		// the blur buffer rather than the screen, so the GPU path declines it
+		// and the whole world falls back to the software rasteriser for the
+		// duration of the warp - about 120 ms per frame at 4K.
+		//
+		// --skip_blur turns it off for measurements; the effect is visibly gone
+		// then, so it is not a fix.
+		if (!CommandLineParams.DoSkipBlur() &&
+			D41A0_0.str_0x21AE.xxxx_0x21B1 && D41A0_0.m_GameSettings.m_Display.xxxx_0x2191 &&
+			m_ptrBlurBuffer_E9C3C)
 		{
 			//Blur
 			v35 = ViewPortRenderBufferStart_DE558;
