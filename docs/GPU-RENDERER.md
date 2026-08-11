@@ -18,6 +18,7 @@ original software path.
 | World sprites and billboards | `gpuSprites` | same vertex stream as the terrain |
 | Exact destination blends | `gpuExactBlend` | rasterizer ordered views, default on |
 | Sky | `gpuSky` | requires `gpuExactBlend` |
+| Exit warp blur | with `gpuWorldGeometry` | see "The exit warp" below |
 
 Each flag can be switched off independently, which makes it possible to compare
 the GPU and software paths directly and to bisect a visual difference to the
@@ -92,6 +93,33 @@ Sprite pixels live in a per-frame R8 atlas (shelf packer, one texel replicated
 border per entry, cached by source pointer) and are marked by a bit in the
 packed vertex field.
 
+### The exit warp
+
+At the end of a level the game warps the player to the exit and puts a blur over
+the world. Its structure is easy to misread, and both misreadings cost time:
+
+1. The world is rendered **into the blur buffer**, not onto the screen.
+2. The buffer is blended against the screen, which still carries the *previous*
+   frame, through the same 256x256 table the translucent pixel modes use.
+3. The blend loop then leaves `DrawWorld` through the jump at its end — which
+   sits *past* the normal world pass. So during the warp the world is drawn
+   **once**, and the blended image is the frame.
+
+The cost follows from step 1: because that pass targets the blur buffer rather
+than the screen, the GPU path declines it and the whole world falls back to the
+software rasteriser for as long as the warp lasts. At 3840x2160 that is 60 fps
+against 3.5.
+
+The GPU reaches the same image from the other side: draw the world normally,
+then blend it against the previous frame. One fullscreen pass and two copies per
+frame, and the world never leaves the GPU. `SupportsWarpBlur()` reports when the
+blend shaders are missing, in which case the engine keeps its software path;
+`--blur_on_cpu` forces that path for comparisons.
+
+Because the effect blends against the previous frame, **it is invisible while the
+camera stands still** — two identical images blend to themselves. Any test of it
+has to move the camera.
+
 ## Known limitations
 
 * **Sub-pixel sampling offset.** The software rasteriser starts each scanline
@@ -116,6 +144,16 @@ Two things cost real time during development and are worth knowing:
 * **Renderer regressions only pass with a 640x480 configuration.** The harness
   tolerates one differing pixel per frame, and the HD and original software
   renderers diverge more than that at higher resolutions.
+* **`--hide_graphics` switches the world output off**, and with it
+  `--dump_world_frame`. A run that produces no dump usually has this switch, not
+  a level that was never reached. `--set_level` skips the menus on its own;
+  `--play_file` alone does not and waits in them.
+* **Frame dumps are not reproducible pixel by pixel when the camera moves.** The
+  dump fires on a simulation tick, but the camera interpolates per *rendered*
+  frame, and how many of those have elapsed depends on machine load. Repeat runs
+  of a moving camera differ by around 20 % of their pixels. Comparisons that need
+  motion have to use an aggregate — the mean palette index separates conditions
+  well, spreading by at most 0.6 within one.
 
 ### Useful switches
 
@@ -125,3 +163,15 @@ Two things cost real time during development and are worth knowing:
 | `--force_roll <0..2047>` | pins the camera roll so rolled frames can be compared deterministically |
 | `--cull_mode <0..2>` | triangle winding rejection; 2 is the default and matches the software rasteriser |
 | `--profile_renderer` | per stage timings and frame rate to the log |
+| `--force_blur` | turns the exit warp on during ordinary flight, without reaching the exit |
+| `--skip_blur` | leaves the warp out entirely |
+| `--blur_on_cpu` | keeps the warp on the software path even when the GPU could take it |
+| `--force_level_end <tick>` | completes the level at a simulation tick |
+
+A moving, repeatable camera — which the warp needs — comes from playing back a
+recording into a level:
+
+```
+remc2 --set_level 0 --play_file remc2-regression-test/Levels-1-5-Recording.bin \
+      --dump_world_frame 120 --profile_renderer
+```
