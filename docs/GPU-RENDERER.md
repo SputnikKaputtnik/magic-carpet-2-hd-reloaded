@@ -120,6 +120,28 @@ Because the effect blends against the previous frame, **it is invisible while th
 camera stands still** — two identical images blend to themselves. Any test of it
 has to move the camera.
 
+**The GPU version is visibly weaker than the original, and this is unfinished.**
+The strength of the blur is set by how far the camera travelled between the two
+blended frames, and that distance collapsed along with the frame time. The
+software path ran at 3.5 fps, so it blended against a frame roughly 285 ms old;
+this one runs at 60 and blends against one 16 ms old, by which time the camera
+has barely moved. Part of what made the original warp look forceful was its own
+slowness.
+
+Two directions for whoever picks this up, neither tried:
+
+* Blend against a frame further back — keep a small ring of previous frames and
+  pick the one about 250 ms old, so the temporal distance no longer depends on
+  the frame rate.
+* Accumulate instead: keep a buffer that decays towards the current world each
+  frame, which gives a trail whose length is set by the decay constant rather
+  than by how fast the renderer happens to be.
+
+The second operand also differs in kind. The software path blends against the
+screen buffer, which the GPU path clears to index 0 inside the viewport, so it
+effectively mixes towards black — a darkening on top of the smear. This version
+blends two full-brightness world images, which is milder by construction.
+
 ## Known limitations
 
 * **Sub-pixel sampling offset.** The software rasteriser starts each scanline
@@ -128,6 +150,9 @@ has to move the camera.
   a per scanline offset that vertex data cannot express. Only emulating the DDA
   per scanline would remove it. Adding its nominal expected value (half a
   horizontal step) once per triangle was tried and measured *worse*.
+* **The exit warp blur is weaker than the original.** Its strength followed from
+  the frame time it used to cost, which this renderer removed. See "The exit
+  warp" above for the two ways out.
 * Explosions and particles still use the sprite path rather than real alpha
   blending.
 * Minimap markers are not scaled with the UI.
