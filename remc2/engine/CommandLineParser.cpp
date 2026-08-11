@@ -54,6 +54,7 @@ void CommandLineParser::Init(int argc, char **argv) {
     m_cull_mode = 2;
     m_force_blur = false;
     m_skip_blur = false;
+    m_blur_on_cpu = false;
     m_force_level_end = -1;
     m_probe_sprites = 0;
     m_debugafterload = false;
@@ -289,6 +290,9 @@ void CommandLineParser::InterpretParams() {
 		}
 		else if (param == "--skip_blur") {
 			m_skip_blur = true;
+		}
+		else if (param == "--blur_on_cpu") {
+			m_blur_on_cpu = true;
 		}
 		else if (param == "--force_level_end") {
 			m_force_level_end = std::stoi(*(++p));

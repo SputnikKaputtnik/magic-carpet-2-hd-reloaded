@@ -68,6 +68,9 @@ class CommandLineParser {
 		bool DoForceBlur() const { return m_force_blur; };
 		// Debug: leave out the high speed blur pass (removes the visible effect).
 		bool DoSkipBlur() const { return m_skip_blur; };
+		// Debug: keep the warp blur on the software path even when the GPU
+		// could take it, so both implementations can be compared.
+		bool DoBlurOnCpu() const { return m_blur_on_cpu; };
 		// Debug: complete the level at this simulation tick (exit warp).
 		int GetForceLevelEnd() const { return m_force_level_end; };
         bool DoDebugafterload() const {return m_debugafterload;};
@@ -141,6 +144,7 @@ class CommandLineParser {
 		int m_cull_mode;
 		bool m_force_blur;
 		bool m_skip_blur;
+		bool m_blur_on_cpu;
 		int m_force_level_end;
         bool m_debugafterload;
         bool m_graphics_debug;
