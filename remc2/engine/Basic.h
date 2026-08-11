@@ -567,6 +567,14 @@ void sub_90478_VGA_Blit320(uint8_t maxFps = 0);
 void sub_75200_VGA_Blit640(uint16_t height, uint8_t maxFps = 0);
 uint8_t GetLetterHeight_6FC30();
 void DrawBitmap_2BB40(int16_t posx, int16_t posy, bitmap_pos_struct_t temposstr, uint8_t scale = 1);
+// Stretch-draws an RLE bitmap to a screen rectangle (see GameBitmap); handles
+// the shifted-graphics double draw like DrawBitmap_2BB40.
+void DrawBitmapStretched(
+	const bitmap_pos_struct_t& bitmap,
+	int destinationLeft,
+	int destinationTop,
+	int destinationRight,
+	int destinationBottom);
 
 void GetFont_6FC50(__int16 a1);//250c50
 uint8_t GetLetterWidth_6FC10();

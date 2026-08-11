@@ -1,5 +1,86 @@
 #include "GameBitmap.h"
 
+#include <vector>
+
+void GameBitmap::DrawBitmapStretched(
+	const bitmap_pos_struct_t& bitmap,
+	uint8_t* ptrScreenBuffer,
+	uint32_t stride,
+	int destinationLeft,
+	int destinationTop,
+	int destinationRight,
+	int destinationBottom)
+{
+	const int sourceWidth = bitmap.width_4;
+	const int sourceHeight = bitmap.height_5;
+	const int destinationWidth = destinationRight - destinationLeft;
+	const int destinationHeight = destinationBottom - destinationTop;
+	if (!bitmap.data || sourceWidth <= 0 || sourceHeight <= 0 ||
+		destinationWidth <= 0 || destinationHeight <= 0)
+	{
+		return;
+	}
+
+	// Decode the RLE rows once.  The token stream per row: 0 ends the row, a
+	// byte with the high bit set skips -(int8)token pixels (that is what keeps
+	// the holes of the web transparent), anything else runs that many literal
+	// pixels.  0xFFFF marks pixels the tile never covered.
+	constexpr uint16_t transparent = 0xFFFF;
+	std::vector<uint16_t> decoded(
+		static_cast<size_t>(sourceWidth) * sourceHeight, transparent);
+	const uint8_t* source = bitmap.data;
+	for (int y = 0; y < sourceHeight; ++y)
+	{
+		uint16_t* decodedRow = decoded.data() + static_cast<size_t>(y) * sourceWidth;
+		int x = 0;
+		while (true)
+		{
+			const uint8_t token = *source++;
+			if (token == 0)
+			{
+				break;
+			}
+			if (token & 0x80u)
+			{
+				x += -static_cast<int8_t>(token);
+				continue;
+			}
+			for (int run = 0; run < token; ++run)
+			{
+				const uint8_t pixel = *source++;
+				if (x >= 0 && x < sourceWidth)
+				{
+					decodedRow[x] = pixel;
+				}
+				++x;
+			}
+		}
+	}
+
+	// Nearest neighbour into the destination rectangle.  The column map keeps
+	// the divisions out of the inner loop.
+	std::vector<uint16_t> columnMap(destinationWidth);
+	for (int dx = 0; dx < destinationWidth; ++dx)
+	{
+		columnMap[dx] = static_cast<uint16_t>(dx * sourceWidth / destinationWidth);
+	}
+	for (int dy = 0; dy < destinationHeight; ++dy)
+	{
+		const int sy = dy * sourceHeight / destinationHeight;
+		const uint16_t* decodedRow = decoded.data() + static_cast<size_t>(sy) * sourceWidth;
+		uint8_t* destination = ptrScreenBuffer +
+			static_cast<size_t>(destinationTop + dy) * stride + destinationLeft;
+		for (int dx = 0; dx < destinationWidth; ++dx)
+		{
+			const uint16_t value = decodedRow[columnMap[dx]];
+			if (value != transparent)
+			{
+				destination[dx] = static_cast<uint8_t>(value);
+			}
+		}
+	}
+}
+
 void GameBitmap::DrawColourizedBitmap(uint8_t* ptrBitmapData, uint8_t colour, uint8_t* ptrScreenBuffer, uint32_t stride, int16_t posX, int16_t posY, uint8_t posHeight, uint8_t scale)
 {
 	ptrScreenBuffer = (stride * posY + posX + ptrScreenBuffer);

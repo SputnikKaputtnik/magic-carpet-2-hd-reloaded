@@ -1,6 +1,9 @@
 #include "Basic.h"
 #include "engine_support.h"
 #include "CommandLineParser.h"
+#include "GameBitmap.h"
+
+#include <algorithm>
 
 std::string gameDataPath;
 std::string cdDataPath;
@@ -1496,6 +1499,34 @@ void DrawBitmap_2BB40(int16_t posx, int16_t posy, bitmap_pos_struct_t tempposstr
 			drawBitmap320_8F8B0(posx, posy, tempposstr);
 		else
 			drawBitmap640_8F8E8(posx, posy, tempposstr, scale);
+		pdwScreenBuffer_351628 = temp_screen_buffer;
+	}
+}
+
+// Draws an RLE bitmap stretched to a screen rectangle, clipped to the screen.
+// New code (no original address): the original never scaled these bitmaps.
+void DrawBitmapStretched(
+	const bitmap_pos_struct_t& bitmap,
+	int destinationLeft,
+	int destinationTop,
+	int destinationRight,
+	int destinationBottom)
+{
+	destinationLeft = (std::max)(destinationLeft, 0);
+	destinationTop = (std::max)(destinationTop, 0);
+	destinationRight = (std::min)(destinationRight, (int)screenWidth_18062C);
+	destinationBottom = (std::min)(destinationBottom, (int)screenHeight_180624);
+
+	GameBitmap::DrawBitmapStretched(
+		bitmap, pdwScreenBuffer_351628, screenWidth_18062C,
+		destinationLeft, destinationTop, destinationRight, destinationBottom);
+	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)
+	{
+		uint8_t* temp_screen_buffer = pdwScreenBuffer_351628;
+		pdwScreenBuffer_351628 = x_DWORD_E9C3C;
+		GameBitmap::DrawBitmapStretched(
+			bitmap, pdwScreenBuffer_351628, screenWidth_18062C,
+			destinationLeft, destinationTop, destinationRight, destinationBottom);
 		pdwScreenBuffer_351628 = temp_screen_buffer;
 	}
 }

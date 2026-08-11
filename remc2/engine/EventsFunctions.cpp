@@ -21669,44 +21669,75 @@ void DrawGameFrame_2BE30()//20CE30
 			if (x_DWORD_D4188 && playerEntity->dword_0xA4_164x->mobilizeCounter_0x14E_334)
 			{
 				//Draw Spiders Web
-				int16_t offSetX = 0;
-				int16_t offSetY = 0;
-				int maxCountX;
-				int maxCountY;
 				if (x_WORD_180660_VGA_type_resolution & 1)
 				{
-					maxCountY = 2;
-					maxCountX = 4;
+					// Original low resolution path: 4x2 tiles, unscaled.
+					actPlayerIndex = 1;
+					int countY = 0;
+					int y = 0;
+					int yAdd = x_DWORD_D418C[1].height_5;
+					while (countY < 2)
+					{
+						int countX = 0;
+						int x = 0;
+						while (countX < 4)
+						{
+							DrawBitmap_2BB40(x, y, x_DWORD_D4188t_spritestr[actPlayerIndex]);
+							countX++;
+							actPlayerIndex++;
+							x += x_DWORD_D4188t_spritestr[actPlayerIndex].width_4;
+							yAdd = x_DWORD_D4188t_spritestr[1].height_5;
+						}
+						countY++;
+						y += yAdd;
+					}
 				}
 				else
 				{
-					maxCountY = 4;
-					maxCountX = 6;
-				}
-				if (x_WORD_180660_VGA_type_resolution != 1)
-					if (!DefaultResolutions())
+					// The web is one picture cut into a 6x4 grid of RLE tiles
+					// summing to 640x480.  The original centred that block
+					// unscaled, which at HD resolutions leaves a small
+					// rectangle in the middle of the screen; the point of the
+					// effect is that the player is wrapped in the web, so each
+					// tile is stretched to its proportional share of the whole
+					// screen instead.  At exactly 640x480 the stretch is the
+					// identity.
+					constexpr int webColumns = 6;
+					constexpr int webRows = 4;
+					int webSourceWidth = 0;
+					for (int column = 0; column < webColumns; column++)
+						webSourceWidth += x_DWORD_D4188t_spritestr[1 + column].width_4;
+					int webSourceHeight = 0;
+					for (int row = 0; row < webRows; row++)
+						webSourceHeight += x_DWORD_D4188t_spritestr[1 + row * webColumns].height_5;
+					if (webSourceWidth > 0 && webSourceHeight > 0)
 					{
-						offSetX = (screenWidth_18062C - 640) / 2;
-						offSetY = (screenHeight_180624 - 480) / 2;
+						actPlayerIndex = 1;
+						int sourceY = 0;
+						for (int row = 0; row < webRows; row++)
+						{
+							const int rowHeight =
+								x_DWORD_D4188t_spritestr[actPlayerIndex].height_5;
+							int sourceX = 0;
+							for (int column = 0; column < webColumns; column++)
+							{
+								const bitmap_pos_struct_t& tile =
+									x_DWORD_D4188t_spritestr[actPlayerIndex];
+								// Shared tile edges land on identical integer
+								// boundaries, so the stretched grid neither
+								// gaps nor overlaps.
+								DrawBitmapStretched(
+									tile,
+									sourceX * (int)screenWidth_18062C / webSourceWidth,
+									sourceY * (int)screenHeight_180624 / webSourceHeight,
+									(sourceX + tile.width_4) * (int)screenWidth_18062C / webSourceWidth,
+									(sourceY + rowHeight) * (int)screenHeight_180624 / webSourceHeight);
+								sourceX += tile.width_4;
+								actPlayerIndex++;
+							}
+							sourceY += rowHeight;
+						}
 					}
-				actPlayerIndex = 1;
-				int countY = 0;
-				int y = 0;
-				int yAdd = x_DWORD_D418C[1].height_5;
-				while (countY < maxCountY)
-				{
-					int countX = 0;
-					int x = 0;
-					while (countX < maxCountX)
-					{
-						DrawBitmap_2BB40(offSetX + x, offSetY + y, x_DWORD_D4188t_spritestr[actPlayerIndex]);
-						countX++;
-						actPlayerIndex++;
-						x += x_DWORD_D4188t_spritestr[actPlayerIndex].width_4;
-						yAdd = x_DWORD_D4188t_spritestr[1].height_5;
-					}
-					countY++;
-					y += yAdd;
 				}
 			}
 			if (D41A0_0.m_GameSettings.m_Display.m_wMiniMap)
