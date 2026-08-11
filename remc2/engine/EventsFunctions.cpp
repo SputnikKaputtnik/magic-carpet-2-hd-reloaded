@@ -31821,6 +31821,18 @@ void DrawAndEventsInGame_47560(int16_t turn, int simulationSteps)//228560
 	for (int simulationStep = 0; simulationStep < simulationSteps; ++simulationStep)
 	{
 	++gameSimulationTick;
+
+	// Debug: complete the level at a given simulation tick, the way the Shift+C
+	// cheat does.  Makes the exit warp - and the high speed motion blur it
+	// triggers - reproducible without playing the level to its end.
+	if (CommandLineParams.GetForceLevelEnd() > 0 &&
+		gameSimulationTick == CommandLineParams.GetForceLevelEnd())
+	{
+		D41A0_0.struct_0x3659C[D41A0_0.LevelIndex_0xc].substr_3659C.IsLevelEnd_0 = 1;
+		HandleButtonClick_191B0(27, 0);
+		Logger->info("Forced level end at simulation tick {}", gameSimulationTick);
+	}
+
 	if ((CommandLineParams.ModeRegressionsTestType() != -1) && (count_begin == 1))
 		debugcounter_47560++;
 	PaletteChanges_47760();

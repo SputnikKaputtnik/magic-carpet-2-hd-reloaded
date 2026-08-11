@@ -52,6 +52,9 @@ void CommandLineParser::Init(int argc, char **argv) {
     // destination is read exactly (ROV), which shows up as flat quads where
     // land tiles meet water.  --cull_mode 0 restores the old behaviour.
     m_cull_mode = 2;
+    m_force_blur = false;
+    m_skip_blur = false;
+    m_force_level_end = -1;
     m_probe_sprites = 0;
     m_debugafterload = false;
     m_graphics_debug = false;
@@ -280,6 +283,15 @@ void CommandLineParser::InterpretParams() {
 		}
 		else if (param == "--cull_mode") {
 			m_cull_mode = std::stoi(*(++p));
+		}
+		else if (param == "--force_blur") {
+			m_force_blur = true;
+		}
+		else if (param == "--skip_blur") {
+			m_skip_blur = true;
+		}
+		else if (param == "--force_level_end") {
+			m_force_level_end = std::stoi(*(++p));
 		}
 		else if (param == "--set_level") {
 			std::string levelStr = *(++p);

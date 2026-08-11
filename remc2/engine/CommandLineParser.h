@@ -64,6 +64,12 @@ class CommandLineParser {
 		int GetForceRoll() const { return m_force_roll; };
 		// Debug: GPU terrain winding rejection (0 off, 1 drop CW, 2 drop CCW).
 		int GetCullMode() const { return m_cull_mode; };
+		// Debug: force the high speed motion blur pass on, without flying fast.
+		bool DoForceBlur() const { return m_force_blur; };
+		// Debug: leave out the high speed blur pass (removes the visible effect).
+		bool DoSkipBlur() const { return m_skip_blur; };
+		// Debug: complete the level at this simulation tick (exit warp).
+		int GetForceLevelEnd() const { return m_force_level_end; };
         bool DoDebugafterload() const {return m_debugafterload;};
         bool DoGraphicsDebug() const {return m_graphics_debug;};
         bool DoHideGraphics() const {return m_hide_graphics;};
@@ -133,6 +139,9 @@ class CommandLineParser {
 		int m_probe_sprites;
 		int m_force_roll;
 		int m_cull_mode;
+		bool m_force_blur;
+		bool m_skip_blur;
+		int m_force_level_end;
         bool m_debugafterload;
         bool m_graphics_debug;
         bool m_hide_graphics;
