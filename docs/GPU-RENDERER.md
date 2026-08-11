@@ -110,37 +110,42 @@ than the screen, the GPU path declines it and the whole world falls back to the
 software rasteriser for as long as the warp lasts. At 3840x2160 that is 60 fps
 against 3.5.
 
-The GPU reaches the same image from the other side: draw the world normally,
-then blend it against the previous frame. One fullscreen pass and two copies per
-frame, and the world never leaves the GPU. `SupportsWarpBlur()` reports when the
-blend shaders are missing, in which case the engine keeps its software path;
-`--blur_on_cpu` forces that path for comparisons.
+The GPU version draws the world normally — which is what keeps the frame rate —
+and applies the effect afterwards, **in the palette presenter, behind the
+palette resolve**. That placement is the result of a failed attempt worth
+recording: in index space there is no fractional blending. The 256x256 table is
+one fixed mix, and it pulls weakly — measured against the game palette, a lookup
+lands only about a fifth of the way between its operands, because the result has
+to be an index the palette actually contains. Dithering around that limitation
+(update only a fraction of the pixels per frame) turns the missing fractions
+into visible grain, an ordered matrix into a standing grid. In RGB, after the
+palette resolve, `lerp` simply exists.
 
-Because the effect blends against the previous frame, **it is invisible while the
-camera stands still** — two identical images blend to themselves. Any test of it
+The presenter keeps a trail buffer at game resolution and moves it towards the
+current world each frame by `1 - exp(-dt / tau)` — an exponential decay whose
+constant is a **duration**, so the trail keeps its length whatever frame rate
+the renderer reaches. The naive alternative, blending against the previous
+frame, fails exactly there: the software warp looked forceful because at 3.5 fps
+its "previous frame" stood 285 ms of camera travel apart, and at 60 fps that
+distance collapses to nothing. The displayed image is `lerp(world, trail,
+strength)`; CPU-drawn pixels (HUD, text) stay out of the mix, which is the same
+order the software warp has — it blends before the HUD is drawn.
+
+Because the effect blends against earlier frames, **it is invisible while the
+camera stands still** — the trail converges to the current image. Any test of it
 has to move the camera.
 
-**The GPU version is visibly weaker than the original, and this is unfinished.**
-The strength of the blur is set by how far the camera travelled between the two
-blended frames, and that distance collapsed along with the frame time. The
-software path ran at 3.5 fps, so it blended against a frame roughly 285 ms old;
-this one runs at 60 and blends against one 16 ms old, by which time the camera
-has barely moved. Part of what made the original warp look forceful was its own
-slowness.
+The defaults (strength 85%, decay 1400 ms) were tuned by eye against the
+original at 4K. A derivation from the software warp's arithmetic (20% of an
+~350 ms old frame) is far too subtle at a smooth frame rate; matching how the
+warp *felt* takes far more than matching what its code computed.
 
-Two directions for whoever picks this up, neither tried:
-
-* Blend against a frame further back — keep a small ring of previous frames and
-  pick the one about 250 ms old, so the temporal distance no longer depends on
-  the frame rate.
-* Accumulate instead: keep a buffer that decays towards the current world each
-  frame, which gives a trail whose length is set by the decay constant rather
-  than by how fast the renderer happens to be.
-
-The second operand also differs in kind. The software path blends against the
-screen buffer, which the GPU path clears to index 0 inside the viewport, so it
-effectively mixes towards black — a darkening on top of the smear. This version
-blends two full-brightness world images, which is milder by construction.
+The engine requests the effect through the world renderer
+(`SetWarpBlurEnabled`), which only carries the parameters; the presenter picks
+them up at present time. Both gates of the software warp stay in charge, so the
+effect fires only during the actual exit warp sequence. `--blur_on_cpu` forces
+the software path for comparisons; the availability flag flows the other way,
+from the presenter's `Initialize` into `SupportsWarpBlur()`.
 
 ## Known limitations
 
@@ -150,9 +155,9 @@ blends two full-brightness world images, which is milder by construction.
   a per scanline offset that vertex data cannot express. Only emulating the DDA
   per scanline would remove it. Adding its nominal expected value (half a
   horizontal step) once per triangle was tried and measured *worse*.
-* **The exit warp blur is weaker than the original.** Its strength followed from
-  the frame time it used to cost, which this renderer removed. See "The exit
-  warp" above for the two ways out.
+* **The exit warp trail lives in RGB, not in the palette.** During the warp the
+  world's colours leave the palette; the original's coarse colour snapping in
+  the blur is smoothed out. `--warp_strength` / `--warp_decay_ms` tune it.
 * Explosions and particles still use the sprite path rather than real alpha
   blending.
 * Minimap markers are not scaled with the UI.
@@ -191,6 +196,8 @@ Two things cost real time during development and are worth knowing:
 | `--force_blur` | turns the exit warp on during ordinary flight, without reaching the exit |
 | `--skip_blur` | leaves the warp out entirely |
 | `--blur_on_cpu` | keeps the warp on the software path even when the GPU could take it |
+| `--warp_strength <0..100>` | share of the trail in the displayed image during the warp (default 85) |
+| `--warp_decay_ms <ms>` | trail length as a duration, frame rate independent (default 1400) |
 | `--force_level_end <tick>` | completes the level at a simulation tick |
 
 A moving, repeatable camera — which the warp needs — comes from playing back a

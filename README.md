@@ -20,7 +20,7 @@ None of this would exist without the work above. See [Credits](#credits).
 - **Exact draw order** between terrain and sprites, so nothing floats in front of geometry it should be hidden behind
 - **Exact destination blending** (translucent water, shadows) via rasterizer ordered views
 - **Roughly 30x less CPU time per world frame**, e.g. 11.85 ms -> 0.40 ms at 1280x720
-- **The exit warp keeps its frame rate** - it used to drop the world onto the software rasteriser, 60 fps to 3.5 at 4K (its blur is milder than the original, see the docs)
+- **The exit warp keeps its frame rate** - it used to drop the world onto the software rasteriser, 60 fps to 3.5 at 4K; its blur is an RGB trail behind the palette resolve, tunable via `--warp_strength` / `--warp_decay_ms`
 - **View distance up to 4x**, switchable in game
 - **Frame rate counter**, switchable in game
 - Every stage sits behind its own feature flag; with all of them off you get the unchanged software renderer
@@ -251,8 +251,7 @@ e.g. `void sub_19CA0_sound_proc5(unsigned __int8 a1)` was renamed to `void Chang
 - [x] Exact destination blending through rasterizer ordered views
 - [x] Sky on the GPU
 - [x] View distance up to 4x, switchable in game
-- [x] Exit warp blur on the GPU, so the level end keeps its frame rate
-- [ ] Restore the full strength of the exit warp blur - it is milder than the original because its intensity used to come from the frame time it cost
+- [x] Exit warp blur on the GPU, so the level end keeps its frame rate - an RGB trail behind the palette resolve, frame rate independent and tunable
 - [ ] Explosions and particles with real alpha blending instead of the sprite path
 - [ ] Minimap markers scaled with the UI
 - [ ] Emulate the per scanline DDA to remove the last sub-pixel sampling offset
