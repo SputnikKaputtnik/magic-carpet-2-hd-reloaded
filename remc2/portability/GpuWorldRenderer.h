@@ -116,6 +116,21 @@ public:
 	// software rasteriser must stay silent.
 	bool IsCapturing() const;
 
+	// The exit warp.  The engine renders the world into its blur buffer, blends
+	// that against the screen - which still carries the previous frame - and
+	// then leaves DrawWorld before the normal world pass, so the blended image
+	// is the frame.  Because that single pass targets the blur buffer instead
+	// of the screen, the GPU path declines it and the whole world falls back to
+	// the software rasteriser while the warp lasts.
+	//
+	// Enabling this reproduces the same result one step later: the world is
+	// drawn normally and then blended against the previous frame, which keeps
+	// it on the GPU.  Set per frame, before the world pass.
+	void SetWarpBlurEnabled(bool enabled);
+	// False when the blend shaders are missing, i.e. the warp has to stay on
+	// the software path.
+	bool SupportsWarpBlur() const;
+
 	// True for the shading modes the pixel shader reproduces exactly.
 	static bool SupportsMode(uint8_t mode);
 

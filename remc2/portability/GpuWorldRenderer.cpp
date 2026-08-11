@@ -337,6 +337,42 @@ float4 main(VertexOutput input) : SV_TARGET
 }
 )";
 
+	// The exit warp blend.  Replaces the engine's per pixel loop, which reads
+	// the blur buffer and the screen and looks the pair up in the same 256x256
+	// table the translucent pixel modes use:
+	//
+	//   screen[p] = tablesx[0x4000 + screen[p] * 256 + blur[p]]
+	//
+	// Drawn as a fullscreen triangle, so it needs no vertex buffer; the
+	// viewport restricts it to the world region.
+	constexpr char BlurBlendVertexShaderSource[] = R"(
+float4 main(uint vertexId : SV_VertexID) : SV_POSITION
+{
+    float2 corner = float2((vertexId << 1) & 2, vertexId & 2);
+    return float4(corner * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), 0.0f, 1.0f);
+}
+)";
+
+	constexpr char BlurBlendPixelShaderSource[] = R"(
+Texture2D<float> BlendTable : register(t0);
+Texture2D<float> PreviousFrame : register(t1);
+Texture2D<float> CurrentWorld : register(t2);
+
+uint LoadByte(Texture2D<float> source, int x, int y)
+{
+    return (uint)(source.Load(int3(x, y, 0)) * 255.0f + 0.5f);
+}
+
+float4 main(float4 position : SV_POSITION) : SV_TARGET
+{
+    int2 texel = int2(position.xy);
+    uint destination = LoadByte(PreviousFrame, texel.x, texel.y);
+    uint source = LoadByte(CurrentWorld, texel.x, texel.y);
+    float encoded = (float)LoadByte(BlendTable, (int)source, (int)destination) / 255.0f;
+    return float4(encoded, encoded, encoded, 1.0f);
+}
+)";
+
 	bool CompileWorldShader(
 		const char* source,
 		const char* target,
@@ -412,6 +448,21 @@ struct GpuWorldRenderer::Impl
 	ComPtr<ID3D11ShaderResourceView> indexTargetSrv;
 	ComPtr<ID3D11UnorderedAccessView> indexTargetUav;
 	ComPtr<ID3D11Texture2D> backgroundTexture;
+
+	// Holds the world of the current frame while it is blended, because a
+	// texture cannot be sampled and rendered at the same time.
+	ComPtr<ID3D11Texture2D> currentWorldCopy;
+	ComPtr<ID3D11ShaderResourceView> currentWorldCopySrv;
+	// The finished frame, kept for the next one.  This is what the engine finds
+	// in the screen buffer when the warp blends, and mixing the new world into
+	// it is what produces the trail.
+	ComPtr<ID3D11Texture2D> previousFrame;
+	ComPtr<ID3D11ShaderResourceView> previousFrameSrv;
+	ComPtr<ID3D11VertexShader> blurBlendVertexShader;
+	ComPtr<ID3D11PixelShader> blurBlendPixelShader;
+	bool warpBlurEnabled = false;
+	// Why the warp cannot run on the GPU (empty when it can).
+	std::string warpBlurDiagnostic;
 
 	ComPtr<ID3D11Texture2D> atlasTexture;
 	ComPtr<ID3D11ShaderResourceView> atlasView;
@@ -498,6 +549,10 @@ struct GpuWorldRenderer::Impl
 		indexTarget.Reset();
 		backgroundView.Reset();
 		backgroundTexture.Reset();
+		currentWorldCopySrv.Reset();
+		currentWorldCopy.Reset();
+		previousFrameSrv.Reset();
+		previousFrame.Reset();
 
 		ID3D11Device* device = GpuRenderDevice::Get().GetDevice();
 		if (!device)
@@ -550,6 +605,32 @@ struct GpuWorldRenderer::Impl
 				lastError = GpuHResultMessage("CreateUnorderedAccessView(world)", result);
 				return false;
 			}
+		}
+
+		// The two buffers the warp blend needs.  Same format as the index
+		// target, and left uninitialised - so is the engine's blur buffer.
+		D3D11_TEXTURE2D_DESC blendDescription = description;
+		blendDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+		result = device->CreateTexture2D(&blendDescription, nullptr, &currentWorldCopy);
+		if (SUCCEEDED(result))
+		{
+			result = device->CreateShaderResourceView(
+				currentWorldCopy.Get(), nullptr, &currentWorldCopySrv);
+		}
+		if (SUCCEEDED(result))
+		{
+			result = device->CreateTexture2D(&blendDescription, nullptr, &previousFrame);
+		}
+		if (SUCCEEDED(result))
+		{
+			result = device->CreateShaderResourceView(
+				previousFrame.Get(), nullptr, &previousFrameSrv);
+		}
+		if (FAILED(result))
+		{
+			lastError = GpuHResultMessage("CreateTexture2D(warp blend buffers)", result);
+			return false;
 		}
 
 		D3D11_TEXTURE2D_DESC backgroundDescription = description;
@@ -967,6 +1048,40 @@ bool GpuWorldRenderer::Initialize()
 		}
 	}
 
+	// Fullscreen pass for the exit warp blend.  A failure here is not fatal:
+	// SetWarpBlurEnabled then finds no shader, declines, and the engine keeps
+	// running its own per pixel loop.
+	{
+		ComPtr<ID3DBlob> blendVertexByteCode;
+		ComPtr<ID3DBlob> blendPixelByteCode;
+		std::string blendError;
+		if (CompileWorldShader(
+				BlurBlendVertexShaderSource, "vs_4_0", blendVertexByteCode, blendError) &&
+			CompileWorldShader(
+				BlurBlendPixelShaderSource, "ps_4_0", blendPixelByteCode, blendError) &&
+			SUCCEEDED(device->CreateVertexShader(
+				blendVertexByteCode->GetBufferPointer(),
+				blendVertexByteCode->GetBufferSize(),
+				nullptr,
+				&m_impl->blurBlendVertexShader)) &&
+			SUCCEEDED(device->CreatePixelShader(
+				blendPixelByteCode->GetBufferPointer(),
+				blendPixelByteCode->GetBufferSize(),
+				nullptr,
+				&m_impl->blurBlendPixelShader)))
+		{
+			// Both shaders are in place; the warp can run on the GPU.
+		}
+		else
+		{
+			m_impl->blurBlendVertexShader.Reset();
+			m_impl->blurBlendPixelShader.Reset();
+			m_impl->warpBlurDiagnostic = blendError.empty()
+				? std::string("warp blend shader unavailable")
+				: blendError;
+		}
+	}
+
 	const D3D11_INPUT_ELEMENT_DESC layout[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -1129,6 +1244,22 @@ void GpuWorldRenderer::SetTriangleCullMode(int mode)
 	{
 		m_impl->triangleCullMode = mode;
 	}
+}
+
+void GpuWorldRenderer::SetWarpBlurEnabled(bool enabled)
+{
+	if (m_impl)
+	{
+		// Without the blend shaders the renderer cannot take the warp, and the
+		// engine has to keep it on the software path.
+		m_impl->warpBlurEnabled = enabled &&
+			m_impl->blurBlendVertexShader && m_impl->blurBlendPixelShader;
+	}
+}
+
+bool GpuWorldRenderer::SupportsWarpBlur() const
+{
+	return m_impl && m_impl->blurBlendVertexShader && m_impl->blurBlendPixelShader;
 }
 
 void GpuWorldRenderer::SetSkyEnabled(bool enabled)
@@ -1660,6 +1791,41 @@ void GpuWorldRenderer::EndWorld(
 	}
 	context->OMSetRenderTargets(0, nullptr, nullptr);
 	context->PSSetShaderResources(0, 5, nullViews);
+
+	// The exit warp: mix the world that was just drawn into the previous frame.
+	// The engine reaches the same result the other way round - it renders the
+	// world into its blur buffer, blends it against the screen and skips the
+	// normal world pass - but doing it here keeps the world on the GPU.
+	if (impl.warpBlurEnabled && impl.previousFrame && impl.currentWorldCopy &&
+		impl.blurBlendVertexShader && impl.blurBlendPixelShader)
+	{
+		context->CopyResource(impl.currentWorldCopy.Get(), impl.indexTarget.Get());
+
+		ID3D11ShaderResourceView* blendResources[3] = {
+			impl.blendView.Get(),
+			impl.previousFrameSrv.Get(),
+			impl.currentWorldCopySrv.Get()
+		};
+		context->OMSetRenderTargets(1, impl.indexTargetView.GetAddressOf(), nullptr);
+		context->IASetInputLayout(nullptr);
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		context->IASetVertexBuffers(0, 0, nullptr, nullptr, nullptr);
+		context->VSSetShader(impl.blurBlendVertexShader.Get(), nullptr, 0);
+		context->PSSetShader(impl.blurBlendPixelShader.Get(), nullptr, 0);
+		context->PSSetShaderResources(0, 3, blendResources);
+		context->Draw(3, 0);
+		context->OMSetRenderTargets(0, nullptr, nullptr);
+		context->PSSetShaderResources(0, 3, nullViews);
+	}
+
+	// The engine's second blend operand is the screen buffer, which carries the
+	// previous frame.  Keeping that copy on every frame - not only during the
+	// warp - means the first warp frame already blends against the frame before
+	// it, exactly as the software path does.
+	if (impl.previousFrame)
+	{
+		context->CopyResource(impl.previousFrame.Get(), impl.indexTarget.Get());
+	}
 }
 
 void GpuWorldRenderer::InvalidateTextureAtlas()
@@ -1850,6 +2016,15 @@ void GpuWorldRenderer::SetExactBlendEnabled(bool)
 
 void GpuWorldRenderer::SetTriangleCullMode(int)
 {
+}
+
+void GpuWorldRenderer::SetWarpBlurEnabled(bool)
+{
+}
+
+bool GpuWorldRenderer::SupportsWarpBlur() const
+{
+	return false;
 }
 
 void GpuWorldRenderer::SetSkyEnabled(bool)

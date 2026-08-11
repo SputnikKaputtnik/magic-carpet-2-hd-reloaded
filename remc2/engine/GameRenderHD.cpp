@@ -423,9 +423,21 @@ void GameRenderHD::DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ
 		//
 		// --skip_blur turns it off for measurements; the effect is visibly gone
 		// then, so it is not a fix.
-		if (!CommandLineParams.DoSkipBlur() &&
+		const bool warpBlurWanted = !CommandLineParams.DoSkipBlur() &&
 			D41A0_0.str_0x21AE.xxxx_0x21B1 && D41A0_0.m_GameSettings.m_Display.xxxx_0x2191 &&
-			m_ptrBlurBuffer_E9C3C)
+			m_ptrBlurBuffer_E9C3C;
+
+		// The GPU reaches the same image the other way round: it draws the
+		// world normally - which is what keeps the frame rate - and blends that
+		// against the previous frame afterwards.  The software block below is
+		// then skipped entirely, including its jump past the world pass.
+		GpuWorldRenderer& gpuWorld = GpuWorldRenderer::Get();
+		const bool warpBlurOnGpu = warpBlurWanted &&
+			gpuWorld.IsGeometryEnabled() && gpuWorld.SupportsWarpBlur() &&
+			!CommandLineParams.DoBlurOnCpu();
+		gpuWorld.SetWarpBlurEnabled(warpBlurOnGpu);
+
+		if (warpBlurWanted && !warpBlurOnGpu)
 		{
 			//Blur
 			v35 = ViewPortRenderBufferStart_DE558;
