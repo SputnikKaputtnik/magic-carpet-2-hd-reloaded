@@ -11,4 +11,7 @@ extern uint32_t screenWidth_18062C;
 extern int iScreenWidth_DE560;
 extern uint8_t* ViewPortRenderBufferStart_DE558;
 extern uint8_t* ViewPortRenderBufferAltStart_DE554;
-inline extern const char* VersionNumber = "Magic Carpet 2 HD - Reloaded fork 1.0";
+// Versioning: 1.0 would suggest "finished", which this is not - the fork
+// starts public life at 0.8.  Every bug fix bumps the patch digit (0.8.1,
+// 0.8.2, ...); feature milestones move the minor version.
+inline extern const char* VersionNumber = "Magic Carpet 2 HD - Reloaded fork 0.8";

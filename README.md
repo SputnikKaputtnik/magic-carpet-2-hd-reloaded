@@ -1,4 +1,4 @@
-# Magic Carpet 2 HD - Reloaded fork 1.0
+# Magic Carpet 2 HD - Reloaded fork 0.8
 
 A fork of **Magic Carpet 2 HD** that moves the world renderer from the CPU to
 the GPU (Direct3D 11) while reproducing the original software renderer pixel
