@@ -71,6 +71,12 @@ class CommandLineParser {
 		// Debug: keep the warp blur on the software path even when the GPU
 		// could take it, so both implementations can be compared.
 		bool DoBlurOnCpu() const { return m_blur_on_cpu; };
+		// How long the exit warp trail lasts, in milliseconds.  A duration, not
+		// a frame count: the trail decays at a rate taken from elapsed time.
+		int GetWarpDecayMs() const { return m_warp_decay_ms; };
+		// How much of the trail the displayed image carries during the exit
+		// warp, in percent (0..100).
+		int GetWarpStrength() const { return m_warp_strength; };
 		// Debug: complete the level at this simulation tick (exit warp).
 		int GetForceLevelEnd() const { return m_force_level_end; };
         bool DoDebugafterload() const {return m_debugafterload;};
@@ -145,6 +151,8 @@ class CommandLineParser {
 		bool m_force_blur;
 		bool m_skip_blur;
 		bool m_blur_on_cpu;
+		int m_warp_decay_ms;
+		int m_warp_strength;
 		int m_force_level_end;
         bool m_debugafterload;
         bool m_graphics_debug;

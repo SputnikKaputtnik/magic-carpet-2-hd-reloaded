@@ -428,13 +428,16 @@ void GameRenderHD::DrawWorld_411A0(int posX, int posY, int16_t yaw, int16_t posZ
 			m_ptrBlurBuffer_E9C3C;
 
 		// The GPU reaches the same image the other way round: it draws the
-		// world normally - which is what keeps the frame rate - and blends that
-		// against the previous frame afterwards.  The software block below is
-		// then skipped entirely, including its jump past the world pass.
+		// world normally - which is what keeps the frame rate - and the palette
+		// presenter mixes a decaying trail over it in RGB, where fractional
+		// blending exists.  The software block below is then skipped entirely,
+		// including its jump past the world pass.
 		GpuWorldRenderer& gpuWorld = GpuWorldRenderer::Get();
 		const bool warpBlurOnGpu = warpBlurWanted &&
 			gpuWorld.IsGeometryEnabled() && gpuWorld.SupportsWarpBlur() &&
 			!CommandLineParams.DoBlurOnCpu();
+		gpuWorld.SetWarpDecaySeconds(CommandLineParams.GetWarpDecayMs() / 1000.0f);
+		gpuWorld.SetWarpStrength(CommandLineParams.GetWarpStrength() / 100.0f);
 		gpuWorld.SetWarpBlurEnabled(warpBlurOnGpu);
 
 		if (warpBlurWanted && !warpBlurOnGpu)

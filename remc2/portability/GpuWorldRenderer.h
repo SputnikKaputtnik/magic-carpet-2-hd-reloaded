@@ -123,13 +123,27 @@ public:
 	// of the screen, the GPU path declines it and the whole world falls back to
 	// the software rasteriser while the warp lasts.
 	//
-	// Enabling this reproduces the same result one step later: the world is
-	// drawn normally and then blended against the previous frame, which keeps
-	// it on the GPU.  Set per frame, before the world pass.
-	void SetWarpBlurEnabled(bool enabled);
-	// False when the blend shaders are missing, i.e. the warp has to stay on
-	// the software path.
-	bool SupportsWarpBlur() const;
+	// The GPU version lives in the palette presenter, after the palette
+	// resolve: in RGB there is real fractional blending, which index space
+	// cannot offer (a blend result must be an index the palette has, and
+	// dithering around that limitation reads as grain).  The renderer only
+	// carries the request and its parameters; the presenter picks them up at
+	// present time.  Set per frame, before the world pass.
+	void SetWarpBlurEnabled(bool enabled) { m_warpBlurEnabled = enabled; }
+	bool IsWarpBlurEnabled() const { return m_warpBlurEnabled; }
+	// How long the trail lasts.  The trail buffer decays towards the current
+	// world at a rate derived from elapsed time, so this is a duration and not
+	// a number of frames - the effect keeps its length whatever frame rate the
+	// renderer reaches.
+	void SetWarpDecaySeconds(float seconds) { m_warpDecaySeconds = seconds; }
+	float GetWarpDecaySeconds() const { return m_warpDecaySeconds; }
+	// How much of the trail the displayed image carries, 0..1.
+	void SetWarpStrength(float strength) { m_warpStrength = strength; }
+	float GetWarpStrength() const { return m_warpStrength; }
+	// Reported by the presenter once its warp passes compiled.  False means the
+	// warp has to stay on the engine's software path.
+	void SetWarpTrailAvailable(bool available) { m_warpTrailAvailable = available; }
+	bool SupportsWarpBlur() const { return m_warpTrailAvailable; }
 
 	// True for the shading modes the pixel shader reproduces exactly.
 	static bool SupportsMode(uint8_t mode);
@@ -216,4 +230,10 @@ private:
 
 	struct Impl;
 	std::unique_ptr<Impl> m_impl;
+
+	// The exit warp request, carried here for the presenter (see above).
+	bool m_warpBlurEnabled = false;
+	bool m_warpTrailAvailable = false;
+	float m_warpDecaySeconds = 0.35f;
+	float m_warpStrength = 0.35f;
 };

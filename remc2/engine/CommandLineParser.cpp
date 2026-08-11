@@ -55,6 +55,12 @@ void CommandLineParser::Init(int argc, char **argv) {
     m_force_blur = false;
     m_skip_blur = false;
     m_blur_on_cpu = false;
+    // Tuned by eye against the original at 4K.  The derivation from the
+    // software warp (20% of an ~350 ms old frame) turned out far too subtle at
+    // a smooth frame rate - the original's force came from watching it at
+    // 3.5 fps, where every ghost image stood a large camera step apart.
+    m_warp_decay_ms = 1400;
+    m_warp_strength = 85;
     m_force_level_end = -1;
     m_probe_sprites = 0;
     m_debugafterload = false;
@@ -293,6 +299,12 @@ void CommandLineParser::InterpretParams() {
 		}
 		else if (param == "--blur_on_cpu") {
 			m_blur_on_cpu = true;
+		}
+		else if (param == "--warp_decay_ms") {
+			m_warp_decay_ms = std::stoi(*(++p));
+		}
+		else if (param == "--warp_strength") {
+			m_warp_strength = std::stoi(*(++p));
 		}
 		else if (param == "--force_level_end") {
 			m_force_level_end = std::stoi(*(++p));
