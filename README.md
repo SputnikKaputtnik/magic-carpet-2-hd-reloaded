@@ -46,8 +46,16 @@ this fork's:
 * Downloads and installer: https://github.com/thobbsinteractive/magic-carpet-2-hd/releases/latest
 * Installation guide (GOG edition or original CD): https://github.com/thobbsinteractive/magic-carpet-2-hd/wiki/Windows-Installation-Guide
 
-## Installing this fork ##
-**You need your own copy of Magic Carpet 2.** No game data is contained in this
+## Download ##
+
+**[Download remc2.exe (Windows x64)](https://github.com/SputnikKaputtnik/magic-carpet-2-hd-reloaded/releases/latest/download/remc2.exe)** — always the latest release.
+[All releases and their notes](https://github.com/SputnikKaputtnik/magic-carpet-2-hd-reloaded/releases).
+
+The executable only. It replaces the `remc2.exe` of an existing Magic Carpet 2 HD
+installation - see below. It is not code signed, so SmartScreen will warn; the
+release notes carry the SHA256 to check against.
+
+## Installing this fork ##**You need your own copy of Magic Carpet 2.** No game data is contained in this
 repository and none will ever be - the GOG edition or an original CD is
 required.
 
