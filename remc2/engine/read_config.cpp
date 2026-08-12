@@ -89,6 +89,11 @@ std::string findConfigFile() {
 			config_locations.push_back(home_dir + "/remc2/config.json");
 		}
 #endif //__linux__
+		// This build usually sits in a folder it shares with the base project,
+		// whose config.json belongs to the base project's executable.  Taking
+		// config-gpu.json first, when it exists, lets the two keep separate
+		// settings - resolution above all - instead of fighting over one file.
+		config_locations.push_back(get_exe_path() + "/config-gpu.json");
 		config_locations.push_back(get_exe_path() + "/config.json");
 	}
 	std::string configfile;

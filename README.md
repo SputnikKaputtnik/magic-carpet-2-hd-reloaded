@@ -31,7 +31,7 @@ The Magic Carpet 2 HD community lives on Discord: https://discord.gg/GR55HCbJJ4
 - **The exit warp keeps its frame rate** - it used to drop the world onto the software rasteriser, 60 fps to 3.5 at 4K; its blur is an RGB trail behind the palette resolve, tunable via `--warp_strength` / `--warp_decay_ms`
 - **View distance up to 4x**, switchable in game
 - **Frame rate counter**, switchable in game
-- Every stage sits behind its own feature flag; with all of them off you get the unchanged software renderer
+- Every stage sits behind its own feature flag - all on by default, and with all of them off you get the unchanged software renderer
 
 Technical documentation, measurements and known limitations:
 [docs/GPU-RENDERER.md](docs/GPU-RENDERER.md)
@@ -53,9 +53,9 @@ this fork's:
 
 The executable only, and deliberately named apart from the base project's
 `remc2.exe`: put it **next to** that one rather than over it and both stay
-playable, because the game finds its data and its `config.json` by where the
-executable sits, not by what it is called. It is not code signed, so SmartScreen
-will warn; the release notes carry the SHA256 to check against.
+playable, because the game finds its data by where the executable sits, not by
+what it is called. It is not code signed, so SmartScreen will warn; the release
+notes carry the SHA256 to check against.
 
 ## Installing this fork ##
 
@@ -67,33 +67,42 @@ required.
    That sets up the game data, the configurator and everything else.
 2. Download `remc2-gpu.exe` above, or build this fork yourself (see
    [Build](#build)).
-3. Put it in the same folder as the `remc2.exe` of that installation, and start
-   it instead of the original. Nothing is overwritten, and you can go back by
-   simply starting `remc2.exe` again.
-4. Enable the GPU renderer in `config.json` under `graphics`:
+3. Put it in the same folder as the `remc2.exe` of that installation and start
+   it instead of the original.
+
+That is the whole installation. **The GPU renderer is on by default** - there is
+nothing to edit, and nothing is overwritten. To go back, start `remc2.exe`
+again.
+
+### Keeping the settings apart ###
+
+Both executables read `config.json`, which means they share one resolution. If
+you want different settings for each - a higher resolution for the GPU renderer,
+say - copy `config.json` to **`config-gpu.json`** in the same folder and edit
+that. `remc2-gpu.exe` prefers it when it is there and leaves `config.json` to
+the base project.
+
+Either file can switch individual stages off again under `graphics`:
 
 ```json
 "gpuPalettePresentation": true,
 "gpuWorldGeometry": true,
 "gpuSprites": true,
-"gpuSky": true
+"gpuSky": true,
+"gpuExactBlend": true
 ```
 
-`gpuExactBlend` defaults to on. If your GPU has no support for rasterizer
-ordered views the renderer says so in the log and falls back automatically, so
-the flag is safe to leave alone.
+Setting all of them to `false` gives you the unchanged software renderer inside
+this executable.
 
-Requirements: Windows with Direct3D 11. `gpuSky` and the exact blend modes need
+Requirements: Windows with Direct3D 11. `gpuSky` and the exact blend modes want
 feature level 11_1 hardware, which in practice means anything from roughly 2013
-onwards. Without it the other stages still work.
+onwards; without it those stages say so in the log and step aside on their own,
+and the rest keeps working.
 
-To go back to the original software renderer at any time, set all `gpu*` flags
-to `false` - or just start `remc2.exe` again.
-
-Note that both executables share the same `config.json`, and the Magic Carpet 2
-HD configurator and its shortcuts keep launching the original `remc2.exe`. If
-you would rather have the GPU renderer behind those, back up `remc2.exe` and
-rename `remc2-gpu.exe` to take its place.
+One thing to know: the Magic Carpet 2 HD configurator and its shortcuts keep
+launching the original `remc2.exe`. If you would rather have the GPU renderer
+behind those, back up `remc2.exe` and rename `remc2-gpu.exe` into its place.
 
 # Controls #
 Controls can be redefined in the Configurator/Config.json file, however here are the defaults:
@@ -309,3 +318,4 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+

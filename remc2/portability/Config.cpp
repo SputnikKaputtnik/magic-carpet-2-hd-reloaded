@@ -345,11 +345,17 @@ Config::Settings::Graphics Config::GetGraphics(const json& settings)
 		graphicsValues.m_WindowResHeight = ReadIntValue(graphics, "windowResHeight");
 		graphicsValues.m_MaintainAspectRatio = ReadBoolValue(graphics, "maintainAspectRatio");
 		graphicsValues.m_StartWindowed = ReadBoolValue(graphics, "startWindowed");
-		graphicsValues.m_GpuPalettePresentation = graphics.value("gpuPalettePresentation", false);
-		graphicsValues.m_GpuWorldGeometry = graphics.value("gpuWorldGeometry", false);
-		graphicsValues.m_GpuSprites = graphics.value("gpuSprites", false);
+		// The GPU stages default to on.  This build exists for them, and a
+		// configuration file that predates it - the base project's - carries
+		// none of these keys, so defaulting to off meant the renderer silently
+		// stayed on the software path until someone hand edited JSON.  Each
+		// stage still declines on its own when the hardware cannot take it, and
+		// writing the key explicitly still wins.
+		graphicsValues.m_GpuPalettePresentation = graphics.value("gpuPalettePresentation", true);
+		graphicsValues.m_GpuWorldGeometry = graphics.value("gpuWorldGeometry", true);
+		graphicsValues.m_GpuSprites = graphics.value("gpuSprites", true);
 		graphicsValues.m_GpuExactBlend = graphics.value("gpuExactBlend", true);
-		graphicsValues.m_GpuSky = graphics.value("gpuSky", false);
+		graphicsValues.m_GpuSky = graphics.value("gpuSky", true);
 
 		graphicsValues.m_GameDetail = GetGameDetail(graphics);
 		graphicsValues.m_Threading = GetThreading(graphics);
