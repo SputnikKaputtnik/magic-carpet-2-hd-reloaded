@@ -55,7 +55,9 @@ The executable only. It replaces the `remc2.exe` of an existing Magic Carpet 2 H
 installation - see below. It is not code signed, so SmartScreen will warn; the
 release notes carry the SHA256 to check against.
 
-## Installing this fork ##**You need your own copy of Magic Carpet 2.** No game data is contained in this
+## Installing this fork ##
+
+**You need your own copy of Magic Carpet 2.** No game data is contained in this
 repository and none will ever be - the GOG edition or an original CD is
 required.
 
