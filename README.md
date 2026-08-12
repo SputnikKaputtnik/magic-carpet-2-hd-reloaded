@@ -48,12 +48,14 @@ this fork's:
 
 ## Download ##
 
-**[Download remc2.exe (Windows x64)](https://github.com/SputnikKaputtnik/magic-carpet-2-hd-reloaded/releases/latest/download/remc2.exe)** — always the latest release.
+**[Download remc2-gpu.exe (Windows x64)](https://github.com/SputnikKaputtnik/magic-carpet-2-hd-reloaded/releases/latest/download/remc2-gpu.exe)** — always the latest release.
 [All releases and their notes](https://github.com/SputnikKaputtnik/magic-carpet-2-hd-reloaded/releases).
 
-The executable only. It replaces the `remc2.exe` of an existing Magic Carpet 2 HD
-installation - see below. It is not code signed, so SmartScreen will warn; the
-release notes carry the SHA256 to check against.
+The executable only, and deliberately named apart from the base project's
+`remc2.exe`: put it **next to** that one rather than over it and both stay
+playable, because the game finds its data and its `config.json` by where the
+executable sits, not by what it is called. It is not code signed, so SmartScreen
+will warn; the release notes carry the SHA256 to check against.
 
 ## Installing this fork ##
 
@@ -63,9 +65,11 @@ required.
 
 1. Install Magic Carpet 2 HD first, using the installer and guide linked above.
    That sets up the game data, the configurator and everything else.
-2. Build this fork (see [Build](#build)) or take `remc2.exe` from a release of
-   this repository.
-3. Replace the `remc2.exe` of your Magic Carpet 2 HD installation with it.
+2. Download `remc2-gpu.exe` above, or build this fork yourself (see
+   [Build](#build)).
+3. Put it in the same folder as the `remc2.exe` of that installation, and start
+   it instead of the original. Nothing is overwritten, and you can go back by
+   simply starting `remc2.exe` again.
 4. Enable the GPU renderer in `config.json` under `graphics`:
 
 ```json
@@ -84,7 +88,12 @@ feature level 11_1 hardware, which in practice means anything from roughly 2013
 onwards. Without it the other stages still work.
 
 To go back to the original software renderer at any time, set all `gpu*` flags
-to `false`.
+to `false` - or just start `remc2.exe` again.
+
+Note that both executables share the same `config.json`, and the Magic Carpet 2
+HD configurator and its shortcuts keep launching the original `remc2.exe`. If
+you would rather have the GPU renderer behind those, back up `remc2.exe` and
+rename `remc2-gpu.exe` to take its place.
 
 # Controls #
 Controls can be redefined in the Configurator/Config.json file, however here are the defaults:
