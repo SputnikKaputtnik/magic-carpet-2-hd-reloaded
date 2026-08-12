@@ -13,7 +13,15 @@ Lineage of this work:
 
 None of this would exist without the work above. See [Credits](#credits).
 
-### find us on Discord here: https://discord.gg/GR55HCbJJ4 ###
+**How this fork was made:** the code in it was written with
+[Claude Code](https://claude.com/claude-code), Anthropic's coding agent. I am
+not a programmer - I directed the work, tested every change on screen and
+decided what was good enough to keep. Saying so up front seems only fair, both
+to the people whose project this builds on and to anyone reading the code. Every
+claim in this README is measured, and how to reproduce the measurements is in
+[docs/GPU-RENDERER.md](docs/GPU-RENDERER.md).
+
+The Magic Carpet 2 HD community lives on Discord: https://discord.gg/GR55HCbJJ4
 
 ## New in this fork ##
 - **Direct3D 11 world renderer** - terrain, world sprites and sky rasterised on the GPU
@@ -28,17 +36,15 @@ None of this would exist without the work above. See [Credits](#credits).
 Technical documentation, measurements and known limitations:
 [docs/GPU-RENDERER.md](docs/GPU-RENDERER.md)
 
-## Current Features ##
-- **Support for HD, 2k and even 4k gameplay**
-- Modern Controls
-- Easy to use **Configurator:**
-<img width="200" height="253" alt="image" src="https://github.com/user-attachments/assets/c6507af5-3be5-4a24-806f-9bb5338ece3b" />
+## What you get from the base project ##
 
-## Download the latest Beta Here (now with MSI Installer)! ##
-https://github.com/thobbsinteractive/magic-carpet-2-hd/releases/latest
+Everything Magic Carpet 2 HD already does stays in place - HD, 2K and 4K
+support, modern controls, the improved sound and music, the configurator, the
+MSI installer and LAN multiplayer. Those are the upstream project's work, not
+this fork's:
 
-## Install Guide for GOG Edition or from Magic Carpet CD ##
-https://github.com/thobbsinteractive/magic-carpet-2-hd/wiki/Windows-Installation-Guide
+* Downloads and installer: https://github.com/thobbsinteractive/magic-carpet-2-hd/releases/latest
+* Installation guide (GOG edition or original CD): https://github.com/thobbsinteractive/magic-carpet-2-hd/wiki/Windows-Installation-Guide
 
 ## Installing this fork ##
 **You need your own copy of Magic Carpet 2.** No game data is contained in this
@@ -93,14 +99,10 @@ Shift+F12 = Frame rate counter</br>
 - Moburma has been tirelessly working to document cut levels, level data structures and missing graphics at: https://tcrf.net/Magic_Carpet_2:_The_Netherworlds
 
 # Build #
-## Status ##
 
-|Branch|Windows|Linux|
-|------|:-----:|:---:|
-|master|[![MSBuild CI](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/msbuild.yml/badge.svg?branch=master)](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/msbuild.yml)|[![Linux 64bit CI](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/linux.yml/badge.svg?branch=master)](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/linux.yml)|
-|development|[![MSBuild CI](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/msbuild.yml/badge.svg?branch=development)](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/msbuild.yml)|[![Linux 64bit CI](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/linux.yml/badge.svg?branch=development)](https://github.com/thobbsinteractive/magic-carpet-2-hd/actions/workflows/linux.yml)|
-
-#### STATUS: Code now runs and all of MC2 (in both Windows and Linux) seems to be playable. Anyone with the GOG edition can download this repo, extract the Game Assets (from a legal GOG copy of the game) and run it. ####
+The GPU renderer is Windows and Direct3D 11 only. The rest of the code builds on
+Windows and Linux exactly as it does upstream - with every `gpu*` flag off, this
+fork behaves like the base project.
 
 ## Steps: to build and run this code
 
@@ -212,7 +214,14 @@ The game will search for this file in the following locations and this particula
 3. next to the `remc2` binary
 
 ## Development Guide ##
-**If you know a bit about game development or want to help out, branch away or email me here: thobbsinteractive@gmail.com**
+
+Contributions to this fork are welcome - open an issue or a pull request here.
+For the base project, contact the Magic Carpet 2 HD maintainers at
+[their repository](https://github.com/thobbsinteractive/magic-carpet-2-hd)
+rather than here.
+
+The conventions below are the base project's and this fork follows them:
+
 - The Project is compiled as C++17.
 - If you re-name a method include the id from the original method name as this makes it easier to track changes from the generated code.
 e.g. `void sub_19CA0_sound_proc5(unsigned __int8 a1)` was renamed to `void ChangeSoundLevel_19CA0(uint8_t option)`
@@ -222,29 +231,10 @@ e.g. `void sub_19CA0_sound_proc5(unsigned __int8 a1)` was renamed to `void Chang
 - Be careful with making logic changes to the code and Test, Test, Test! I recommend playing the first level all the way though. Then the first Cave level (4) and I also recomend Level 5 as you have a nice mix of AI to kill and a cutscene at level completion.
 - Please build and run the remc2-regression-test project BEFORE making a pull request. This must pass and since it needs the game data cannot be placed in the Github Actions.
 
-# ROADMAP #
+# Roadmap of this fork #
 
-## MILESTONE 1 ##
-- [x] Get solution runnable from Visual Studio 2019 build, with minimum of setup. Cut down on unnecessary extra files and libraries and use nuget instead.
-- [x] Refactor reverse engineered code into seperate classes where possible.
+Done:
 
-## MILESTONE 2 ##
-- [x] Add resolution support
-- [ ] Implement Open GL render
-- [X] Implement Controller Support
-- [X] Implement a (platform independent) Launch menu to adjust settings in config.json before launch
-
-## MILESTONE 3 ##
-- [X] Improve sounds and music using updated original scores and directional sounds in game - In Review!
-- [X] Implement a wix sharp .msi installation for new .exe to make patching the and running existing game simple and something similar for the Linux versions
-
-## MILESTONE 4 ##
-- [X] Get basic LAN/IPv4 multiplayer working again
-
-## MILESTONE 5 ##
-- [ ] Get Magic Carpet 1 working using this engine. Ideally with original music and graphics.
-
-## GPU RENDERER (this fork) ##
 - [x] Palette resolve and upscaling on the GPU
 - [x] Terrain and world polygons on the GPU, one draw call per frame
 - [x] World sprites on the GPU, draw order exact against the terrain
@@ -252,14 +242,21 @@ e.g. `void sub_19CA0_sound_proc5(unsigned __int8 a1)` was renamed to `void Chang
 - [x] Sky on the GPU
 - [x] View distance up to 4x, switchable in game
 - [x] Exit warp blur on the GPU, so the level end keeps its frame rate - an RGB trail behind the palette resolve, frame rate independent and tunable
+
+Next:
+
 - [ ] Explosions and particles with real alpha blending instead of the sprite path
 - [ ] Minimap markers scaled with the UI
 - [ ] Emulate the per scanline DDA to remove the last sub-pixel sampling offset
 - [ ] Linux/Vulkan or OpenGL backend alongside the D3D11 one
 
-## LONG TERM GOALS ##
-- Add VR support back into the game (yes it was originally supported! This game was waaay ahead of its time)<br />
-- Implement online multiplayer match making
+Being investigated: whether the engine's projection can carry a real 3D camera
+with a per-eye asymmetric frustum - the one question that decides whether a
+native VR port is possible. The renderer has no depth buffer and its correctness
+rests on draw order, which is what makes this interesting.
+
+For the roadmap of the upstream project this fork builds on, see
+[thobbsinteractive/magic-carpet-2-hd](https://github.com/thobbsinteractive/magic-carpet-2-hd).
 
 # Credits #
 
