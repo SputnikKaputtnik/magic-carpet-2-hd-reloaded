@@ -7,6 +7,9 @@
 //#include "Entityxxx.h"
 
 extern uint8_t BigTextureBuffer[128 * 128 * 160];//main
+// Number of valid bytes behind BLOCK32DAT_BEGIN_BUFFER after the last terrain
+// block load.  The GPU atlas upload must not read further than this.
+extern uint32_t terrainBlockBufferBytes;
 //signed int sub_AB9E1_get_file_unpack_size(const char* a1);//dataIO
 //signed int UnpackAndLoadMemoryFromPath(Pathstruct path);//dataIO
 //uint8_t* ClearMemoryForPath(Pathstruct path);//dataIO

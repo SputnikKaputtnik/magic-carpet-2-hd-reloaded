@@ -1,5 +1,26 @@
 #include "ReadAndDecompress.h"
+#include "../portability/GpuWorldRenderer.h"
 uint8_t BigTextureBuffer[128 * 128 * 160];
+uint32_t terrainBlockBufferBytes = 0;
+
+namespace
+{
+	// Every write into a terrain block buffer goes through these two helpers so
+	// the GPU world renderer learns both the valid length of the buffer and
+	// that its content changed (day/night/cave switch reuse the same buffer).
+	void LoadTerrainBlocks(const char* dataPath)
+	{
+		const int length = DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+		terrainBlockBufferBytes = length > 0 ? static_cast<uint32_t>(length) : 0u;
+		GpuWorldRenderer::Get().InvalidateTextureAtlas();
+	}
+
+	void LoadBigTerrainBlocks(const char* dataPath)
+	{
+		ReadGraphicsfile(dataPath, BigTextureBuffer);//advance graphics
+		GpuWorldRenderer::Get().InvalidateTextureAtlas();
+	}
+}
 
 //----- (00054630) --------------------------------------------------------
 void sub_54630_load_psxblock(uint16_t TextSize)//235630
@@ -11,6 +32,8 @@ void sub_54630_load_psxblock(uint16_t TextSize)//235630
 		break;
 	case 32:
 		DataFileIO::LoadFileArray_84250(psxadatablock32dat);
+		terrainBlockBufferBytes = xadatablock32dat.var36_size_buffer;
+		GpuWorldRenderer::Get().InvalidateTextureAtlas();
 		break;
 	case 128:
 		break;
@@ -31,13 +54,13 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 		case 16:
 		{
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BLOCK16.DAT");
-			DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+			LoadTerrainBlocks(dataPath);
 			break;
 		}
 		case 32:
 		{
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BLOCK32.DAT");
-			DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+			LoadTerrainBlocks(dataPath);
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/SKYD0-0.DAT");
 			DataFileIO::ReadFileAndDecompress(dataPath, &off_D41A8_sky);//2a51a8
 			break;
@@ -45,7 +68,7 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 		case 128:
 		{
 			sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "block128.data");
-			ReadGraphicsfile(dataPath, BigTextureBuffer);//advance graphics
+			LoadBigTerrainBlocks(dataPath);
 			sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "skyd1024.data");
 			ReadGraphicsfile(dataPath, off_D41A8_sky);//2a51a8
 			break;
@@ -64,12 +87,12 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 			if (D41A0_0.terrain_2FECE.byte_0x2FED2 & 2)
 			{
 				sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL16F0-0.DAT");
-				DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+				LoadTerrainBlocks(dataPath);
 			}
 			else
 			{
 				sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL16N0-0.DAT");
-				DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+				LoadTerrainBlocks(dataPath);
 			}
 			break;
 		}
@@ -78,12 +101,12 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 			if (D41A0_0.terrain_2FECE.byte_0x2FED2 & 2)
 			{
 				sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL32F0-0.DAT");
-				DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+				LoadTerrainBlocks(dataPath);
 			}
 			else
 			{
 				sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL32N0-0.DAT");
-				DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+				LoadTerrainBlocks(dataPath);
 			}
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/SKYN0-0.DAT");
 			DataFileIO::ReadFileAndDecompress(dataPath, &off_D41A8_sky);//2a51a8
@@ -94,12 +117,12 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 			if (D41A0_0.terrain_2FECE.byte_0x2FED2 & 2)
 			{
 				sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "bl128f0-0.data");
-				ReadGraphicsfile(dataPath, BigTextureBuffer);//advance graphics
+				LoadBigTerrainBlocks(dataPath);
 			}
 			else
 			{
 				sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "bl128n0-0.data");
-				ReadGraphicsfile(dataPath, BigTextureBuffer);//advance graphics
+				LoadBigTerrainBlocks(dataPath);
 			}
 			sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "skyn1024.data");
 			ReadGraphicsfile(dataPath, off_D41A8_sky);//2a51a8
@@ -117,19 +140,19 @@ void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_
 		case 16:
 		{
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL16C0-0.DAT");
-			DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+			LoadTerrainBlocks(dataPath);
 			break;
 		}
 		case 32:
 		{
 			sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/BL32C0-0.DAT");
-			DataFileIO::ReadFileAndDecompress(dataPath, &BLOCK32DAT_BEGIN_BUFFER);//2bac2c
+			LoadTerrainBlocks(dataPath);
 			break;
 		}
 		case 128:
 		{
 			sprintf(dataPath, "%s/%s", highResGraphicsPath.c_str(), "bl128c0-0.data");
-			ReadGraphicsfile(dataPath, BigTextureBuffer);//advance graphics
+			LoadBigTerrainBlocks(dataPath);
 			break;
 		}
 		}

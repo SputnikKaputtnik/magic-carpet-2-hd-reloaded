@@ -5,6 +5,7 @@
 #include "../portability/GpuWorldRenderer.h"
 #include "EventsFunctions.h"
 #include "../utilities/SpriteProbe.h"
+#include "ReadAndDecompress.h"
 
 namespace
 {
@@ -32,10 +33,29 @@ namespace
 		return static_cast<uint32_t>(texture - atlasBase);
 	}
 
+	// Bytes the GPU may upload from the terrain atlas.  The address table can
+	// reach textureSize^2 * 256 bytes, but the buffer behind it is often
+	// smaller (BigTextureBuffer holds 160 tiles, not 256), so the upload is
+	// clamped to whichever buffer actually owns the atlas origin.  An unknown
+	// origin uploads nothing rather than reading out of bounds.
 	inline uint32_t TerrainAtlasBytes()
 	{
 		const uint32_t textureSize = x_BYTE_D41B5_texture_size;
-		return textureSize * textureSize * 256u;
+		const uint32_t addressable = textureSize * textureSize * 256u;
+
+		const uint8_t* atlasBase = x_DWORD_DDF50_texture_adresses.at(0);
+		uint32_t capacity = 0;
+		if (atlasBase == BigTextureBuffer)
+		{
+			capacity = static_cast<uint32_t>(sizeof(BigTextureBuffer));
+		}
+		else if (atlasBase && atlasBase == BLOCK32DAT_BEGIN_BUFFER)
+		{
+			capacity = terrainBlockBufferBytes;
+		}
+
+		// Whole atlas rows only - the texture is 256 bytes wide.
+		return (capacity < addressable ? capacity : addressable) & ~255u;
 	}
 
 	// Writes the world as the player would see it: the CPU buffer, and where the
