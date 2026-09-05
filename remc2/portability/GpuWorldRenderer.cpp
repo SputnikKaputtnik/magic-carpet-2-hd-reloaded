@@ -69,6 +69,7 @@ struct VertexInput
     float  shade    : TEXCOORD1;
     uint   texBase  : TEXCOORD2;
     uint   packed   : TEXCOORD3;
+    uint   rect     : TEXCOORD4;
 };
 
 struct VertexOutput
@@ -78,6 +79,7 @@ struct VertexOutput
     noperspective float shade : TEXCOORD1;
     nointerpolation uint texBase : TEXCOORD2;
     nointerpolation uint packed : TEXCOORD3;
+    nointerpolation uint rect : TEXCOORD4;
 };
 
 VertexOutput main(VertexInput input)
@@ -92,6 +94,7 @@ VertexOutput main(VertexInput input)
     output.shade = input.shade;
     output.texBase = input.texBase;
     output.packed = input.packed;
+    output.rect = input.rect;
     return output;
 }
 )";
@@ -136,6 +139,7 @@ struct VertexOutput
     noperspective float shade : TEXCOORD1;
     nointerpolation uint texBase : TEXCOORD2;
     nointerpolation uint packed : TEXCOORD3;
+    nointerpolation uint rect : TEXCOORD4;
 };
 
 uint LoadByte(Texture2D<float> source, int x, int y)
@@ -205,8 +209,15 @@ float4 main(VertexOutput input) : SV_TARGET
         // World sprite (DrawSprite_41BD3): uv addresses the sprite atlas
         // directly, index 0 is transparent, the mode byte is the sprite pixel
         // mode dword0x01_rotIdx.
-        int texelU = (int)floor(input.uv.x);
-        int texelV = (int)floor(input.uv.y);
+        // The CPU blit's DDA never leaves the bitmap; fragments at the slanted
+        // quad edges whose pixel-centre corrected uv falls outside read the
+        // edge texel, exactly like the blit.  Without the clamp a strongly
+        // minified, rolled sprite (many texels per pixel) reached past the one
+        // texel border into the neighbouring atlas entry.
+        int texelU = clamp((int)floor(input.uv.x),
+            (int)(input.texBase & 0xFFFFu), (int)(input.rect & 0xFFFFu));
+        int texelV = clamp((int)floor(input.uv.y),
+            (int)(input.texBase >> 16), (int)(input.rect >> 16));
         uint texel = LoadByte(SpriteAtlas, texelU, texelV);
         if (texel == 0u)
         {
@@ -400,6 +411,9 @@ struct GpuWorldRenderer::Impl
 		float shade;
 		uint32_t textureBase;
 		uint32_t packed;
+		// Sprites: last valid atlas texel (x | y << 16); textureBase carries the
+		// first one.  The pixel shader clamps its lookup to that rectangle.
+		uint32_t rect;
 	};
 
 	ComPtr<ID3D11VertexShader> vertexShader;
@@ -979,7 +993,8 @@ bool GpuWorldRenderer::Initialize()
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 1, DXGI_FORMAT_R32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 2, DXGI_FORMAT_R32_UINT, 0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 3, DXGI_FORMAT_R32_UINT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{ "TEXCOORD", 3, DXGI_FORMAT_R32_UINT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 4, DXGI_FORMAT_R32_UINT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 	result = device->CreateInputLayout(
 		layout,
@@ -1455,12 +1470,20 @@ bool GpuWorldRenderer::SubmitSprite(const GpuSpriteQuad& quad)
 	const float v0 = static_cast<float>(atlasY) + quad.v0;
 	const float v1 = static_cast<float>(atlasY) + quad.v1;
 
+	// Valid texel rectangle of this atlas entry (border excluded), so the
+	// shader can clamp instead of straying into a neighbouring entry.
+	const uint32_t rectMin =
+		static_cast<uint32_t>(atlasX) | (static_cast<uint32_t>(atlasY) << 16);
+	const uint32_t rectMax =
+		static_cast<uint32_t>(atlasX + quad.width - 1) |
+		(static_cast<uint32_t>(atlasY + quad.height - 1) << 16);
+
 	// Corner order P00, P10, P11, P01: u runs along P00->P10, v along P00->P01.
 	const Impl::Vertex corners[4] = {
-		{ { quad.cornerX[0], quad.cornerY[0] }, { u0, v0 }, 0.0f, 0, packed },
-		{ { quad.cornerX[1], quad.cornerY[1] }, { u1, v0 }, 0.0f, 0, packed },
-		{ { quad.cornerX[2], quad.cornerY[2] }, { u1, v1 }, 0.0f, 0, packed },
-		{ { quad.cornerX[3], quad.cornerY[3] }, { u0, v1 }, 0.0f, 0, packed },
+		{ { quad.cornerX[0], quad.cornerY[0] }, { u0, v0 }, 0.0f, rectMin, packed, rectMax },
+		{ { quad.cornerX[1], quad.cornerY[1] }, { u1, v0 }, 0.0f, rectMin, packed, rectMax },
+		{ { quad.cornerX[2], quad.cornerY[2] }, { u1, v1 }, 0.0f, rectMin, packed, rectMax },
+		{ { quad.cornerX[3], quad.cornerY[3] }, { u0, v1 }, 0.0f, rectMin, packed, rectMax },
 	};
 	impl.vertices.push_back(corners[0]);
 	impl.vertices.push_back(corners[1]);
