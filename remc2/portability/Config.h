@@ -79,6 +79,9 @@ public:
 			bool m_Reflections = true;
 			bool m_DynamicLighting = true;
 			int m_ViewDistanceScale = 2;
+			// Distance fog as fractions of the view distance (original: 15/20 and 19/20 tiles).
+			double m_FogStartFraction = 0.75;
+			double m_FogEndFraction = 0.95;
 		};
 
 		struct Threading

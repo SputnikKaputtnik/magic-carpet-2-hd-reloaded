@@ -45,6 +45,8 @@ bool sky = true;
 bool reflections = false;
 bool dynamicLighting = false;
 int viewDistanceScale = 1;
+double fogStartFraction = 0.75;
+double fogEndFraction = 0.95;
 bool multiThreadedRender = false;
 float sizePercentToThreadRender = 0;
 int numberOfRenderThreads = 0;
@@ -238,6 +240,11 @@ bool SetConfig() {
 	// tile step table still walks the map without wrapping onto itself.
 	if (settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale > 0 && settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale < 5)
 		viewDistanceScale = settingsValue.m_Graphics.m_GameDetail.m_ViewDistanceScale;
+	// Fog band as fractions of the view distance; keep it sane and ordered.
+	fogStartFraction = settingsValue.m_Graphics.m_GameDetail.m_FogStartFraction;
+	fogEndFraction = settingsValue.m_Graphics.m_GameDetail.m_FogEndFraction;
+	if (!(fogEndFraction > 0.0) || fogEndFraction > 1.0) fogEndFraction = 0.95;
+	if (!(fogStartFraction > 0.0) || fogStartFraction >= fogEndFraction) fogStartFraction = fogEndFraction * 0.75 / 0.95;
 
 	multiThreadedRender = settingsValue.m_Graphics.m_Threading.m_IsActive;
 	sizePercentToThreadRender = settingsValue.m_Graphics.m_Threading.m_SizePercentToThreadRender;

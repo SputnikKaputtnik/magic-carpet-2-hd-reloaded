@@ -383,6 +383,8 @@ Config::Settings::GameDetail Config::GetGameDetail(const json& graphics)
 		gameDetailValues.m_Reflections = ReadBoolValue(gameDetail, "reflections");
 		gameDetailValues.m_DynamicLighting = ReadBoolValue(gameDetail, "dynamicLighting");
 		gameDetailValues.m_ViewDistanceScale = ReadIntValue(gameDetail, "viewDistanceScale");
+		gameDetailValues.m_FogStartFraction = gameDetail.value("fogStartFraction", 0.75);
+		gameDetailValues.m_FogEndFraction = gameDetail.value("fogEndFraction", 0.95);
 	}
 	return gameDetailValues;
 }
@@ -531,6 +533,8 @@ void Config::SaveGameDetailToDoc(Config::Settings::GameDetail gameDetail)
 	SetBool(gd, "reflections", gameDetail.m_Reflections);
 	SetBool(gd, "dynamicLighting", gameDetail.m_DynamicLighting);
 	SetInt(gd, "viewDistanceScale", gameDetail.m_ViewDistanceScale);
+	gd["fogStartFraction"] = gameDetail.m_FogStartFraction;
+	gd["fogEndFraction"] = gameDetail.m_FogEndFraction;
 }
 
 void Config::SaveThreadingToDoc(Config::Settings::Threading threading)

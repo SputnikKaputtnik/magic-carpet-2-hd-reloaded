@@ -6,6 +6,7 @@
 #include "EventsFunctions.h"
 #include "../utilities/SpriteProbe.h"
 #include "ReadAndDecompress.h"
+#include "read_config.h"
 
 namespace
 {
@@ -939,16 +940,27 @@ void GameRenderHD::DrawTerrainAndParticles_3C080(__int16 posX, __int16 posY, __i
 
 	str_F2C20ar.dword0x15_tileRenderCutOffDistance = (400 * (m_viewDistanceScale * m_viewDistanceScale)) << 16; //Distance cut-off for tile render
 	v278x = 0;
-	str_F2C20ar.dword0x12_FogThickness = 136 << 16;
+	// Distance fog scales with the view distance: the original fades from
+	// 15 to 19 tiles of a 20 tile range (225 / 361 in squared tile units); the
+	// fractions are configurable, so the band stays proportional instead of
+	// shrinking to one tile at scale 4.  Squared because distances are compared
+	// squared.  Bit-identical to the original constants at scale 1.
+	{
+		const double range = 400.0 * (m_viewDistanceScale * m_viewDistanceScale);
+		const int fogStart = static_cast<int>(range * fogStartFraction * fogStartFraction + 0.5);
+		int fogEnd = static_cast<int>(range * fogEndFraction * fogEndFraction + 0.5);
+		if (fogEnd <= fogStart) fogEnd = fogStart + 1;
+		str_F2C20ar.dword0x13_FogStart = fogStart << 16;
+		str_F2C20ar.dword0x16_FogEnd = fogEnd << 16;
+		str_F2C20ar.dword0x12_FogThickness = (fogEnd - fogStart) << 16;
+	}
 	v22 = v277[0];
 	str_F2C20ar.dword0x22 = pitch * (uint16_t)viewPort.Width_DE564 >> 8;
 	LOBYTE(v279) = v22 + HIBYTE(posX);
 	HIBYTE(v279) = v277[1] + HIBYTE(posY);
 	v23 = roll & 0x7FF;
 	str_F2C20ar.cos_0x11 = Maths::sin_DB750[512 + v23];
-	str_F2C20ar.dword0x16_FogEnd = ((400 * (m_viewDistanceScale * m_viewDistanceScale)) - (39 + (20 * (m_viewDistanceScale - 1)))) << 16;
 	str_F2C20ar.sin_0x0d = Maths::sin_DB750[v23];
-	str_F2C20ar.dword0x13_FogStart = ((400 * (m_viewDistanceScale * m_viewDistanceScale)) - (175 + (20 * (m_viewDistanceScale - 1)))) << 16;
 
 	// The GPU can only take over the sky when it also owns this viewport;
 	// stereo / blur passes render into a private buffer and stay on the CPU.
