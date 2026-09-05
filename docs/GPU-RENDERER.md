@@ -222,3 +222,35 @@ recording into a level:
 remc2 --set_level 0 --play_file remc2-regression-test/Levels-1-5-Recording.bin \
       --dump_world_frame 120 --profile_renderer
 ```
+
+
+## Nachtrag 2026-09-05: Nebelband, Sprite-Fallbacks, offene Punkte
+
+* Das Nebelband skaliert jetzt mit der Sichtweite (`fogStartFraction` /
+  `fogEndFraction`, Default 0,75 / 0,95 = Originalproportionen, Sichtweite 1
+  bitgleich). Die Sprite-Nebelformel `32 * (FogEnd - d^2) / Thickness << 8`
+  rechnet dabei 64-bittig: mit dem breiten Band lief sie ab Sichtweite 3 in
+  int32 ueber, der GPU-Hook lehnte die Sprites (Shade mit gesetzten oberen
+  Bits) ab, und der CPU-Blit zeichnete sie mit Muell-Shade gegen den
+  genullten Viewport - beige und durch Terrain sichtbar (Flugdrachen).
+* Jede Ablehnung eines Sprites durch die GPU-Hooks wird jetzt geloggt
+  (`SpriteReject line=... mode=...`, erste 50). Ein abgelehntes Sprite laeuft
+  ueber den CPU-Blit gegen den genullten Viewport und wird ueber das GPU-Bild
+  komponiert (Review-Findings 2/7) - jede verbleibende Ablehnung ist damit
+  ein sichtbarer Fehler.
+* `--dump_world_frame` schreibt zusaetzlich `WorldFrame-<backend>.idx`
+  (Rohindizes) und `Tables.bin` (x_BYTE_F6EE0_tablesx) fuer Tabellenanalysen.
+
+Offen:
+
+1. Big-Sprite-Pfad (`TrySubmitBigWorldSpriteToGpu`) lehnt Modus 8
+   (Dest-Shade, Schatten) ab; Level 8 zeigt das an `class=10 model=0`
+   (40x39, Schattenblob). Der zugehoerige CPU-Blit (`x_BYTE_F2CC6`) hat
+   keinen `case 8` - vor einer Freigabe klaeren, was er mit Modus 8 tut.
+2. Genebelte GPU-Sprites im normalen Pfad koennen zu dunkel sein: Level 8,
+   Tick 120, 4K, Sichtweite 4, Ausschnitt x480..880 y1600..1840 - die
+   Indexanalyse ordnet den GPU-Pixeln Shade-Zeile ~30 zu, den Software-Pixeln
+   ~12, bei gleichem Texel. Formel und Uebergabe (`dword0x00 >> 8`) sind
+   identisch zum CPU-Modus 1/6/7; Verdacht ist eine andere Modus-/
+   Shade-Auswahl zum Hook-Zeitpunkt. Naechster Schritt: am Dump-Tick beide
+   Pfade pro `DrawSprite_41BD3`-Aufruf (Modus, dword0x00, Position) loggen.

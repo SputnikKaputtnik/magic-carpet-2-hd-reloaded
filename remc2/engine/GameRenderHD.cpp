@@ -106,6 +106,22 @@ namespace
 		path = GetSubDirectoryPath("BufferOut") + "/WorldFrame-" + backend + ".bmp";
 		BitmapIO::WriteImageBufferAsImageBMP(path.c_str(), width, height, palette, composed.data());
 
+		// Raw palette indices plus the shading tables, so a GPU/software
+		// difference can be traced to a table row instead of guessed from RGB.
+		{
+			const std::string base = GetSubDirectoryPath("BufferOut") + "/WorldFrame-" + backend;
+			if (FILE* raw = fopen((base + ".idx").c_str(), "wb"))
+			{
+				fwrite(composed.data(), 1, composed.size(), raw);
+				fclose(raw);
+			}
+			if (FILE* tables = fopen((GetSubDirectoryPath("BufferOut") + "/Tables.bin").c_str(), "wb"))
+			{
+				fwrite(x_BYTE_F6EE0_tablesx, 1, sizeof(x_BYTE_F6EE0_tablesx), tables);
+				fclose(tables);
+			}
+		}
+
 		// The palette mapped bitmap hides which index produced a pixel, so the
 		// raw indices go next to it: with them and the shading table an offline
 		// comparison can tell a wrong texel from a wrong shade level.
@@ -2105,7 +2121,7 @@ uint16_t GameRenderHD::sub_3FD60(int a2x, uint8_t playersColors_E88E0x[][3], typ
 					}
 					else if (v8 < str_F2C20ar.dword0x16_FogEnd)
 					{
-						str_F2C20ar.dword0x00 = 32 * (str_F2C20ar.dword0x16_FogEnd - (v40 * v40 + v6 * v6)) / str_F2C20ar.dword0x12_FogThickness << 8;
+						str_F2C20ar.dword0x00 = static_cast<int>(32LL * (str_F2C20ar.dword0x16_FogEnd - (v40 * v40 + v6 * v6)) / str_F2C20ar.dword0x12_FogThickness) << 8 /* 64-bit: the proportional fog band overflows int32 at view distance >= 3 */;
 					}
 					else
 					{
@@ -3602,7 +3618,7 @@ void GameRenderHD::DrawSprites_3E360(int a2x, type_particle_str** str_DWORD_F66F
 						if (v6 <= str_F2C20ar.dword0x13_FogStart)
 							str_F2C20ar.dword0x00 = 0x2000;
 						else
-							str_F2C20ar.dword0x00 = v6 < str_F2C20ar.dword0x16_FogEnd ? 32 * (str_F2C20ar.dword0x16_FogEnd - (v99 * v99 + v5 * v5)) / str_F2C20ar.dword0x12_FogThickness << 8 : 0;
+							str_F2C20ar.dword0x00 = v6 < str_F2C20ar.dword0x16_FogEnd ? static_cast<int>(32LL * (str_F2C20ar.dword0x16_FogEnd - (v99 * v99 + v5 * v5)) / str_F2C20ar.dword0x12_FogThickness) << 8 /* 64-bit: the proportional fog band overflows int32 at view distance >= 3 */ : 0;
 						v7x = &particlesParameters_D951C[str_F2C20ar.dword0x14x->word_0x5A_90];
 						if (!v7x->byte_10)
 						{
@@ -3932,7 +3948,7 @@ void GameRenderHD::DrawSprites_3E360(int a2x, type_particle_str** str_DWORD_F66F
 				}
 				else if (v51 < str_F2C20ar.dword0x16_FogEnd)
 				{
-					str_F2C20ar.dword0x00 = 32 * (str_F2C20ar.dword0x16_FogEnd - (v100 * v100 + v49 * v49)) / str_F2C20ar.dword0x12_FogThickness << 8;
+					str_F2C20ar.dword0x00 = static_cast<int>(32LL * (str_F2C20ar.dword0x16_FogEnd - (v100 * v100 + v49 * v49)) / str_F2C20ar.dword0x12_FogThickness) << 8 /* 64-bit: the proportional fog band overflows int32 at view distance >= 3 */;
 				}
 				else
 				{
@@ -4261,6 +4277,27 @@ void GameRenderHD::DrawSprites_3E360(int a2x, type_particle_str** str_DWORD_F66F
 // 7, 8) and big sprites (x_BYTE_F2CC6) keep the CPU blit and are counted as
 // rejected.  Returns true when the CPU blit must not run (sprite submitted,
 // or it would not have drawn anything anyway).
+// Diagnostic: every sprite the GPU hooks hand back to the CPU blit is logged
+// (first 50), with the reason line, so a mis-rendered fallback can be traced.
+static void RejectSpriteToCpu(int line)
+{
+	static int logged = 0;
+	if (logged < 50)
+	{
+		++logged;
+		Logger->info(
+			"SpriteReject line={} mode={} span={} w={} h={} rw={} rh={} shade=0x{:X} class={} model={}",
+			line, str_F2C20ar.dword0x01_rotIdx, str_F2C20ar.dword0x05,
+			str_F2C20ar.dword0x08_width, str_F2C20ar.dword0x06_height,
+			str_F2C20ar.dword0x09_realWidth, str_F2C20ar.dword0x0c_realHeight,
+			static_cast<unsigned>(str_F2C20ar.dword0x00),
+			str_F2C20ar.dword0x14x ? static_cast<int>(str_F2C20ar.dword0x14x->class_0x3F_63) : -1,
+			str_F2C20ar.dword0x14x ? static_cast<int>(str_F2C20ar.dword0x14x->model_0x40_64) : -1);
+	}
+	GpuWorldRenderer::Get().NoteSpriteRejected();
+}
+#define REJECT_SPRITE_TO_CPU() RejectSpriteToCpu(__LINE__)
+
 static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
 {
 	GpuWorldRenderer& gpu = GpuWorldRenderer::Get();
@@ -4272,14 +4309,14 @@ static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
 	const int mode = str_F2C20ar.dword0x01_rotIdx;
 	if (mode < 0 || mode > 8)
 	{
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7 || mode == 8) &&
 		!gpu.SupportsDestinationReads())
 	{
 		// Destination reading modes need the rasterizer ordered view.
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 
@@ -4289,7 +4326,7 @@ static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
 		// tablesx[dword0x00 | ...]; dword0x00 is the shade level << 8.
 		if (str_F2C20ar.dword0x00 & ~0xFFFF)
 		{
-			gpu.NoteSpriteRejected();
+			REJECT_SPRITE_TO_CPU();
 			return false;
 		}
 		constant = (str_F2C20ar.dword0x00 >> 8) & 0xFF;
@@ -4299,7 +4336,7 @@ static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
 		// Player colour remap through the blend table.
 		if (str_F2C20ar.dword0x07 & ~0xFFFF)
 		{
-			gpu.NoteSpriteRejected();
+			REJECT_SPRITE_TO_CPU();
 			return false;
 		}
 		constant = str_F2C20ar.dword0x07 & 0xFF;
@@ -4320,7 +4357,7 @@ static bool TrySubmitWorldSpriteToGpu(uint32 anchorMode)
 	if (sourceWidth <= 0 || sourceHeight <= 0 || !str_F2C20ar.dword0x02_data ||
 		span == 0 || span > sourceWidth || span < -sourceWidth)
 	{
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 
@@ -4391,13 +4428,13 @@ static bool TrySubmitBigWorldSpriteToGpu()
 	const int mode = str_F2C20ar.dword0x01_rotIdx;
 	if (mode < 0 || mode > 7)
 	{
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7) &&
 		!gpu.SupportsDestinationReads())
 	{
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 
@@ -4406,7 +4443,7 @@ static bool TrySubmitBigWorldSpriteToGpu()
 	{
 		if (str_F2C20ar.dword0x00 & ~0xFFFF)
 		{
-			gpu.NoteSpriteRejected();
+			REJECT_SPRITE_TO_CPU();
 			return false;
 		}
 		constant = (str_F2C20ar.dword0x00 >> 8) & 0xFF;
@@ -4415,7 +4452,7 @@ static bool TrySubmitBigWorldSpriteToGpu()
 	{
 		if (str_F2C20ar.dword0x07 & ~0xFFFF)
 		{
-			gpu.NoteSpriteRejected();
+			REJECT_SPRITE_TO_CPU();
 			return false;
 		}
 		constant = str_F2C20ar.dword0x07 & 0xFF;
@@ -4436,7 +4473,7 @@ static bool TrySubmitBigWorldSpriteToGpu()
 	if (sourceWidth <= 0 || sourceHeight <= 0 || !str_F2C20ar.dword0x02_data ||
 		span <= 0 || span > sourceWidth)
 	{
-		gpu.NoteSpriteRejected();
+		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 
