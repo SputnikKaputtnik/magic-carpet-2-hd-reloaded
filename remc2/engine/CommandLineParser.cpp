@@ -46,6 +46,7 @@ void CommandLineParser::Init(int argc, char **argv) {
     m_test_renderers = false;
 	m_profile_renderer = false;
     m_dump_world_frame = -1;
+    m_toggle_hd_textures_at = -1;
     m_force_roll = -1;
     // Default 2: drop the winding the software rasteriser rejects as well.
     // Without it, overdrawn terrain triangles blend a second time once the
@@ -281,6 +282,9 @@ void CommandLineParser::InterpretParams() {
         }
 		else if (param == "--probe_sprites") {
 			m_probe_sprites = std::stoi(*(++p));
+		}
+		else if (param == "--toggle_hd_textures_at") {
+			m_toggle_hd_textures_at = std::stoi(*(++p));
 		}
 		else if (param == "--dump_world_frame") {
 			m_dump_world_frame = std::stoi(*(++p));

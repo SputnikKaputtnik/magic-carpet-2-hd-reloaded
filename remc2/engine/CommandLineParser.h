@@ -59,6 +59,7 @@ class CommandLineParser {
         bool DoTestRenderers() const {return m_test_renderers;}; //only for debugging!!!!
 		bool DoProfileRenderer() const { return m_profile_renderer; };
 		int GetDumpWorldFrame() const { return m_dump_world_frame; };
+		int GetToggleHdTexturesAt() const { return m_toggle_hd_textures_at; };
 		int GetProbeSprites() const { return m_probe_sprites; };
 		// Debug: fixed camera roll (0..2047) for deterministic A/B renders.
 		int GetForceRoll() const { return m_force_roll; };
@@ -145,6 +146,7 @@ class CommandLineParser {
 		bool m_test_renderers;
 		bool m_profile_renderer;
 		int m_dump_world_frame;
+		int m_toggle_hd_textures_at;
 		int m_probe_sprites;
 		int m_force_roll;
 		int m_cull_mode;

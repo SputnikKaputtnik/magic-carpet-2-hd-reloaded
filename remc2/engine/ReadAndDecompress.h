@@ -3,6 +3,7 @@
 #define MAIN_READANDDECOMPRESS
 #include "MapType.h"
 #include "Basic.h"
+#include <string>
 
 //#include "Entityxxx.h"
 
@@ -17,5 +18,11 @@ extern uint32_t terrainBlockBufferBytes;
 void sub_54630_load_psxblock(uint16_t TextSize);//main
 void sub_54660_read_and_decompress_sky_and_blocks(MapType_t GraphicsType, uint8_t GraphicsSize);//main
 void sub_54800_read_and_decompress_tables(MapType_t a1);//main
+
+// Run-time switch between the CD terrain/sky set (32 px blocks, 256 px sky)
+// and the high-res set (128 px blocks, 1024 px sky).  Only terrain blocks and
+// the sky are swapped; sprites keep the set they were loaded with.  Returns
+// false and leaves everything untouched when the other set is unavailable.
+bool ToggleHighResTerrainTextures(std::string* message);
 
 #endif //MAIN_READANDDECOMPRESS

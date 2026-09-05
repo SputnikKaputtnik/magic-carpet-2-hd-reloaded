@@ -170,7 +170,10 @@ Two things cost real time during development and are worth knowing:
   renders a specific simulation tick, but yaw and pitch stay mouse controlled,
   and D3D11 needs a real window even with `--hide_graphics`. Moving the mouse
   during a comparison run changes the view direction and therefore the whole
-  image. Repeat any surprising result before suspecting the code.
+  image. Starting the process minimised keeps the pointer out of the window
+  (`Start-Process -WindowStyle Minimized`); a reference that differs from an
+  earlier run of the same build and configuration is contaminated, not a
+  regression. Repeat any surprising result before suspecting the code.
 * **Renderer regressions only pass with a 640x480 configuration.** The harness
   tolerates one differing pixel per frame, and the HD and original software
   renderers diverge more than that at higher resolutions.
@@ -184,6 +187,17 @@ Two things cost real time during development and are worth knowing:
   of a moving camera differ by around 20 % of their pixels. Comparisons that need
   motion have to use an aggregate — the mean palette index separates conditions
   well, spreading by at most 0.6 within one.
+
+### In-game keys
+
+The port adds a few keys next to the original ones (F1-F10 are the spell keys
+in the original, with and without Alt):
+
+| Key | Purpose |
+|---|---|
+| `F12` | switches the terrain/sky texture set between the CD set (32 px blocks, 256 px sky) and the high-res set (128 px blocks, 1024 px sky) at run time. Sprites keep the set they were loaded with. Needs the high-res folder from `highResGraphicsFolder`. |
+| `Shift+F11` | cycles the view distance |
+| `Shift+F12` | toggles the fps counter |
 
 ### Useful switches
 
@@ -199,6 +213,7 @@ Two things cost real time during development and are worth knowing:
 | `--warp_strength <0..100>` | share of the trail in the displayed image during the warp (default 85) |
 | `--warp_decay_ms <ms>` | trail length as a duration, frame rate independent (default 1400) |
 | `--force_level_end <tick>` | completes the level at a simulation tick |
+| `--toggle_hd_textures_at <tick>` | performs the F12 texture set switch at a simulation tick, so the switch can be verified by frame dumps |
 
 A moving, repeatable camera — which the warp needs — comes from playing back a
 recording into a level:

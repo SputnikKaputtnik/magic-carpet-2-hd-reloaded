@@ -1,4 +1,5 @@
 #include "PlayerInput.h"
+#include "ReadAndDecompress.h"
 
 #include "../utilities/DataFileIO.h"
 #include "Animation.h"
@@ -397,6 +398,11 @@ void ProcessKeyboardPresses_17190()//1f8190
 					}
 					case 0x3d: {//f3
 						ChangeSettings_1A970(7, 0, 0);
+						LastPressedKey_1806E4 = 0;
+						break;
+					}
+					case 0x58: {//f12 - toggle high-res terrain textures (Shift+F12 is the fps counter)
+						ChangeSettings_1A970(23, 0, 0);
 						LastPressedKey_1806E4 = 0;
 						break;
 					}
@@ -1575,6 +1581,14 @@ void ChangeSettings_1A970(char a1, int a2, int a3)//1fb970
 			SetCurrentNotificationMessage_19760(message, 3u, 50);
 		}
 		return;
+	case 23:
+	{
+		// F12: swap the terrain/sky texture set at run time.
+		std::string message;
+		ToggleHighResTerrainTextures(&message);
+		SetCurrentNotificationMessage_19760(message.c_str(), 3u, 50);
+		return;
+	}
 	case 22:
 		// F12: frame rate readout in the top right corner.
 		showFpsCounter = !showFpsCounter;

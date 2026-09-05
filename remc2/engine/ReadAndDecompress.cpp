@@ -1,5 +1,9 @@
 #include "ReadAndDecompress.h"
+#include "EventsFunctions.h"
+#include "read_config.h"
 #include "../portability/GpuWorldRenderer.h"
+
+#include <filesystem>
 uint8_t BigTextureBuffer[128 * 128 * 160];
 uint32_t terrainBlockBufferBytes = 0;
 
@@ -32,7 +36,12 @@ void sub_54630_load_psxblock(uint16_t TextSize)//235630
 		break;
 	case 32:
 		DataFileIO::LoadFileArray_84250(psxadatablock32dat);
-		terrainBlockBufferBytes = xadatablock32dat.var36_size_buffer;
+		{
+			// LoadFileArray_84250 takes the Pathstruct by value, so the size it
+			// computed never reaches the global; ask the unpack header again.
+			const int unpacked = DataFileIO::sub_AB9E1_get_file_unpack_size(xadatablock32dat.path);
+			terrainBlockBufferBytes = unpacked > 0 ? static_cast<uint32_t>(unpacked) : 0u;
+		}
 		GpuWorldRenderer::Get().InvalidateTextureAtlas();
 		break;
 	case 128:
@@ -192,3 +201,41 @@ void sub_54800_read_and_decompress_tables(MapType_t a1)//235800
 	}
 }
 
+bool ToggleHighResTerrainTextures(std::string* message)
+{
+	const bool enable = (x_BYTE_D41B5_texture_size != 128);
+	if (enable)
+	{
+		if (highResGraphicsPath.empty() || !std::filesystem::is_directory(highResGraphicsPath))
+		{
+			if (message)
+				*message = "High-res graphics folder not found";
+			return false;
+		}
+	}
+	else if (!BLOCK32DAT_BEGIN_BUFFER)
+	{
+		// The game started with the high-res set, so the CD block buffer was
+		// never allocated (sub_54630_load_psxblock skips size 128).  Allocate
+		// it the way the start-up path would.
+		if (DataFileIO::UnpackAndLoadMemoryFromPath(xadatablock32dat) <= 0 || !BLOCK32DAT_BEGIN_BUFFER)
+		{
+			if (message)
+				*message = "BLOCK32.DAT could not be loaded";
+			return false;
+		}
+	}
+
+	bigTextures = enable;
+	texturepixels = enable ? 128 : 32;
+	x_BYTE_D41B5_texture_size = static_cast<uint8_t>(texturepixels);
+
+	// Blocks and sky for the current map type (the loaders invalidate the GPU
+	// atlas), then the tile address / UV tables for the new size.
+	sub_54660_read_and_decompress_sky_and_blocks(D41A0_0.terrain_2FECE.MapType, x_BYTE_D41B5_texture_size);
+	PrepareTerrainTextureAddresses();
+
+	if (message)
+		*message = enable ? "High-res terrain textures ON" : "High-res terrain textures OFF";
+	return true;
+}

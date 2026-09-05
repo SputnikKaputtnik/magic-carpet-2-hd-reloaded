@@ -31852,6 +31852,15 @@ void DrawAndEventsInGame_47560(int16_t turn, int simulationSteps)//228560
 	for (int simulationStep = 0; simulationStep < simulationSteps; ++simulationStep)
 	{
 	++gameSimulationTick;
+	// Debug: --toggle_hd_textures_at <tick> performs the F12 texture set switch
+	// deterministically, so the switch can be verified by frame dumps.
+	if (CommandLineParams.GetToggleHdTexturesAt() > 0 &&
+		gameSimulationTick == CommandLineParams.GetToggleHdTexturesAt())
+	{
+		std::string switchMessage;
+		ToggleHighResTerrainTextures(&switchMessage);
+		Logger->info("Texture set switch at tick {}: {}", gameSimulationTick, switchMessage);
+	}
 
 	// Debug: complete the level at a given simulation tick, the way the Shift+C
 	// cheat does.  Makes the exit warp - and the high speed motion blur it
@@ -43001,22 +43010,16 @@ void sub_5B100(type_entity_0x6E8E* locEvent)//23c100
 }
 
 //----- (0005B7A0) --------------------------------------------------------
-void sub_5B7A0_prepare_textures()//23C7A0
+// Texture UV table and tile address table for the current texture size.
+// Split out of sub_5B7A0_prepare_textures so the run-time texture set switch
+// (F12) can rebuild the addresses without reloading the palette.
+void PrepareTerrainTextureAddresses()
 {
-	if (bigTextures)
-	{
-		x_BYTE_D41B5_texture_size = texturepixels;
-	}
-
 	uint8_t* oldbuf = BLOCK32DAT_BEGIN_BUFFER;
 	if (x_BYTE_D41B5_texture_size == 128)
 		BLOCK32DAT_BEGIN_BUFFER = BigTextureBuffer;
 
-	//x_BYTE_D41B5_texture_size = 16;
-
-	//v0 = x_BYTE_D41B5;
 	sub_3B4D0_fill_unk_D4350_256(x_BYTE_D41B5_texture_size);//21C4D0
-	//v1 = 256 % (256 / x_BYTE_D41B5_texture_size);
 	int texture_addresses_index = 0;
 	for (int ypos = 0; ypos < (signed int)(256 / (256 / x_BYTE_D41B5_texture_size)); ypos++)
 	{
@@ -43026,8 +43029,18 @@ void sub_5B7A0_prepare_textures()//23C7A0
 				(uint8_t*)((ypos * x_BYTE_D41B5_texture_size << 8) + (xpos * x_BYTE_D41B5_texture_size) + BLOCK32DAT_BEGIN_BUFFER);
 		}
 	}
-	sub_5B840_load_Palette_and_help_Palette();//23C840
 	BLOCK32DAT_BEGIN_BUFFER = oldbuf;
+}
+
+void sub_5B7A0_prepare_textures()//23C7A0
+{
+	if (bigTextures)
+	{
+		x_BYTE_D41B5_texture_size = texturepixels;
+	}
+
+	PrepareTerrainTextureAddresses();
+	sub_5B840_load_Palette_and_help_Palette();//23C840
 }
 // D41B5: using guessed type char x_BYTE_D41B5;
 // DDF50: using guessed type int x_DWORD_DDF50[];

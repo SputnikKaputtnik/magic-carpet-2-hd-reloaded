@@ -510,6 +510,7 @@ void sub_7AA70_load_and_decompres_dat_file(const char* a1, uint8_t* a2, int a3, 
 void PlayerEvents_51BB0();
 extern int64_t gameSimulationTick;
 void DrawAndEventsInGame_47560(int16_t turn, int simulationSteps);
+void PrepareTerrainTextureAddresses();
 //x_DWORD /*__cdecl*/ toupper(x_DWORD); //weak
 void sub_55C60(type_str_0x2BDE* loc0x2BDE);
 int32_t /*__cdecl*/ fix_filelength(int32_t);// weak
