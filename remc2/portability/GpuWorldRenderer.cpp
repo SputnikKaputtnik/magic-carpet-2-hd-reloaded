@@ -185,8 +185,15 @@ float4 main(VertexOutput input) : SV_TARGET
 
         if (column > 0)
         {
-            texelX = (texelX + (((column - 1) * skyOrigin.w >> 16) & 255)) % size;
-            texelY = (texelY + (((column - 1) * skyOrigin.z >> 16) & 255)) % size;
+            // The loop's signed 8-bit column deltas telescope to the exact
+            // arithmetic-shift integer part of the accumulator; only the
+            // running index is reduced, and it is reduced modulo the texture
+            // size, never modulo 256.  Masking the step with & 255 dropped
+            // multiples of 256 on the 1024 texel sky (seams every 256 texels).
+            int stepX = ((column - 1) * skyOrigin.w) >> 16;
+            int stepY = ((column - 1) * skyOrigin.z) >> 16;
+            texelX = (((texelX % size) + stepX) % size + size) % size;
+            texelY = (((texelY % size) + stepY) % size + size) % size;
         }
 
         uint skyIndex = ((uint)(texelX + size * texelY)) % (uint)(size * size);
