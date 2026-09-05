@@ -4426,20 +4426,39 @@ static bool TrySubmitBigWorldSpriteToGpu()
 	}
 
 	const int mode = str_F2C20ar.dword0x01_rotIdx;
-	if (mode < 0 || mode > 7)
+	// Mode 8 is the shadow pass (destination shading, the texel only gates
+	// coverage).  The CPU blit of this path has no case for it - neither has
+	// the original's - so big sprites never got their shadow; the GPU draws it
+	// with the same shader branch the normal sprite path uses.
+	if (mode < 0 || mode > 8)
 	{
 		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
-	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7) &&
+	if ((mode == 2 || mode == 3 || mode == 6 || mode == 7 || mode == 8) &&
 		!gpu.SupportsDestinationReads())
 	{
 		REJECT_SPRITE_TO_CPU();
 		return false;
 	}
 
+	// Diagnostic: the first shadow passes of big sprites, with the simulation
+	// tick, so a frame containing one can be dumped for the GPU/CPU comparison.
+	if (mode == 8 && str_F2C20ar.dword0x00 != 0x2000)
+	{
+		static int shadowLogged = 0;
+		if (shadowLogged < 60)
+		{
+			++shadowLogged;
+			Logger->info("SpriteShadow tick={} row={} col={} rw={} rh={} shade=0x{:X}",
+				gameSimulationTick, str_F2C20ar.dword0x03_screenX, str_F2C20ar.dword0x04_screenY,
+				str_F2C20ar.dword0x09_realWidth, str_F2C20ar.dword0x0c_realHeight,
+				static_cast<unsigned>(str_F2C20ar.dword0x00));
+		}
+	}
+
 	int constant = 0;
-	if (mode == 1 || mode == 6 || mode == 7)
+	if (mode == 1 || mode == 6 || mode == 7 || mode == 8)
 	{
 		if (str_F2C20ar.dword0x00 & ~0xFFFF)
 		{
