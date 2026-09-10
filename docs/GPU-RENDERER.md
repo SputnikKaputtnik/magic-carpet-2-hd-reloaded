@@ -174,6 +174,11 @@ Two things cost real time during development and are worth knowing:
   (`Start-Process -WindowStyle Minimized`); a reference that differs from an
   earlier run of the same build and configuration is contaminated, not a
   regression. Repeat any surprising result before suspecting the code.
+* **`--test_renderers` forces every GPU stage off.** The suite compares the HD
+  software renderer against the original one on the CPU, so with the stages on
+  (their default since 0.8.1) the HD image is on the GPU, the CPU buffer holds
+  what BeginWorld cleared it to, and every pixel differs. Between 0.8.1 and the
+  upstream merge the suite failed silently for exactly that reason.
 * **Renderer regressions only pass with a 640x480 configuration.** The harness
   tolerates one differing pixel per frame, and the HD and original software
   renderers diverge more than that at higher resolutions.

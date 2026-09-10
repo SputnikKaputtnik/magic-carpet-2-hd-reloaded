@@ -1,5 +1,19 @@
 # What's new
 
+## Unreleased
+
+* **Merged upstream `development` (52e0c1b, 48 commits)** - the network rework,
+  multiplayer scores, popup messages and "fix load game" from the base project.
+  Upstream's renames (`ColourLookupTable_F6EE0`, `ProjectionVertex`,
+  `ptrMemoryBuffer_E9C3C`) are applied to this fork's files. The GPU world frame
+  is byte-identical to 0.8.2 after the merge (0 of 921600 indices differ).
+* **`--test_renderers` switches the GPU stages off by itself.** The renderer
+  regressions compare the HD software renderer against the original one on the
+  CPU; since the stages default to on (0.8.1) the HD image lived on the GPU and
+  every pixel differed - the suite had been failing silently, including against
+  the 0.8.2 release. The mode now forces the stages off whatever the
+  configuration says. 16/16 with the unchanged test configuration.
+
 ## 0.8.2 (2026-09-06)
 
 Fixes and changes since 0.8.1. Findings from the external code review of the

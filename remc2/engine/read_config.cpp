@@ -189,6 +189,21 @@ bool SetConfig() {
 	gpuSprites = settingsValue.m_Graphics.m_GpuSprites;
 	gpuExactBlend = settingsValue.m_Graphics.m_GpuExactBlend;
 	gpuSky = settingsValue.m_Graphics.m_GpuSky;
+
+	// --test_renderers compares the HD software renderer against the original
+	// one, frame by frame, on the CPU.  With the GPU stages on, the HD image
+	// lives on the GPU and the CPU buffer the comparison reads holds only what
+	// BeginWorld cleared it to - every pixel differs and the test fails without
+	// telling anyone why.  The mode therefore switches the stages off itself,
+	// whatever the configuration says; since 0.8.1 they default to on.
+	if (CommandLineParams.DoTestRenderers())
+	{
+		gpuPalettePresentation = false;
+		gpuWorldGeometry = false;
+		gpuSprites = false;
+		gpuExactBlend = false;
+		gpuSky = false;
+	}
 	gameResWidth = settingsValue.m_Graphics.m_GameDetail.m_GameResWidth;
 	gameResHeight = settingsValue.m_Graphics.m_GameDetail.m_GameResHeight;
 	if (gameResWidth < 320 || gameResHeight < 200)
