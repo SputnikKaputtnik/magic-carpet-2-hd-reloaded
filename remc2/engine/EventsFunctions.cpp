@@ -903,9 +903,9 @@ int sub_76840();
 //int sub_7F7D0(uint8_t** a1, uint8_t** a2, uint8_t* a3, char* a4);
 //uint32_t DrawText_7FAE0(char* a1, __int16 a2, __int16 a3, __int16 a4, unsigned __int8 a5);
 //void DrawText_7FB90(char* a1, int16_t a2, int16_t a3, uint8_t a4);
-// int sub_7FCB0_draw_text_with_border(int a1, x_BYTE *a2, int a3, int a4, int a5, char a6, unsigned __int8 a7, __int16 a8);
+// int DrawTextWithBoarder_7FCB0(int a1, x_BYTE *a2, int a3, int a4, int a5, char a6, unsigned __int8 a7, __int16 a8);
 // int sub_81260(int a1, int a2, int a3, __int16 a4, __int16 a5);
-void sub_81360_draw_bitmap_line(int16_t a1, int16_t a2, int16_t a3, int16_t a4, __int16 a5);
+void DrawBitmapLine_81360(int16_t a1, int16_t a2, int16_t a3, int16_t a4, __int16 a5);
 // unsigned int sub_81CA0(int a1, int a2, __int16 a3, __int16 a4, int a5);
 void sub_82AB0(unsigned __int8 a1);
 void sub_83B50();
@@ -21447,14 +21447,14 @@ void sub_2BBB0(int16_t posX, int16_t posY, bitmap_pos_struct_t a3, uint8_t scale
 	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)
 	{
 		temp_screen_buffer = pdwScreenBuffer_351628;
-		pdwScreenBuffer_351628 = (uint8_t*)x_DWORD_E9C3C;
+		pdwScreenBuffer_351628 = (uint8_t*)ptrMemoryBuffer_E9C3C;
 		/*result = */ptrDrawBitmap_F01EC(posX, posY, a3, scale);
 		pdwScreenBuffer_351628 = temp_screen_buffer;
 	}
 	//return result;
 }
 // D41A0: using guessed type int x_D41A0_BYTEARRAY_0;
-// E9C3C: using guessed type int x_DWORD_E9C3C;
+// E9C3C: using guessed type int ptrMemoryBuffer_E9C3C;
 // F01EC: using guessed type int (*ptrDrawBitmap_F01EC)(x_DWORD, x_DWORD, x_DWORD);
 // 180628: using guessed type int pdwScreenBuffer_351628;
 
@@ -22153,8 +22153,8 @@ void DrawTextPauseEndOfLevel_2CE30(int16_t posX, int16_t posY, uint8_t scale)//2
 				{
 				case 0u:
 					//v9 = *(x_WORD *)(v7x + x_D41A0_BYTEARRAY_0 + 11230 + 77);
-					D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307--;// = v9 - 1;
-					if (D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307 + 1 <= 0)
+					D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307--;// = v9 - 1;
+					if (D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307 + 1 <= 0)
 						goto LABEL_24;
 					sprintf(printbuffer, "%s %s", D41A0_0.array_0x2BDE[v7y].WizardName_0x39f_2BFA_12157, D41A0_0.array_0x2BDE[v7y].CurrentNotificationText_0x01c_2BFA_11258);
 					DrawText_2BC10(printbuffer, textPosX, textPosY, (*xadataclrd0dat.colorPalette_var28)[3840], scale);
@@ -22164,11 +22164,11 @@ void DrawTextPauseEndOfLevel_2CE30(int16_t posX, int16_t posY, uint8_t scale)//2
 					break;
 				case 1u:
 					//v13 = *(x_WORD *)(v7x + x_D41A0_BYTEARRAY_0 + 11230 + 77);
-					D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307--;
-					if (D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307 + 1 <= 0)
+					D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307--;
+					if (D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307 + 1 <= 0)
 						goto LABEL_24;
 					sprintf(printbuffer, "[%s] %s", D41A0_0.array_0x2BDE[v7y].WizardName_0x39f_2BFA_12157, D41A0_0.array_0x2BDE[v7y].CurrentNotificationText_0x01c_2BFA_11258);
-					if (D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307 <= 100)
+					if (D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307 <= 100)
 					{
 						v15 = (*xadataclrd0dat.colorPalette_var28)[3840];
 					}
@@ -22185,8 +22185,8 @@ void DrawTextPauseEndOfLevel_2CE30(int16_t posX, int16_t posY, uint8_t scale)//2
 				case 2u:
 				case 4u:
 					//v11 = *(x_WORD *)(v7x + x_D41A0_BYTEARRAY_0 + 11230 + 77);
-					D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307--;
-					if (D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307 + 1 <= 0)
+					D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307--;
+					if (D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307 + 1 <= 0)
 						goto LABEL_24;
 					if (D41A0_0.array_0x2BDE[v7y].word_0x04f_2C2D_11309 == 3 || v22 == D41A0_0.LevelIndex_0xc)
 					{
@@ -22200,8 +22200,8 @@ void DrawTextPauseEndOfLevel_2CE30(int16_t posX, int16_t posY, uint8_t scale)//2
 					break;
 				case 3u:
 					//v17 = *(x_WORD *)(v7x + x_D41A0_BYTEARRAY_0 + 11230 + 77);
-					D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307--;
-					if (D41A0_0.array_0x2BDE[v7y].word_0x04d_2C2B_11307 + 1 <= 0)
+					D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307--;
+					if (D41A0_0.array_0x2BDE[v7y].CurrentNotificationDuration_0x04d_2C2B_11307 + 1 <= 0)
 					{
 					LABEL_24:
 						D41A0_0.array_0x2BDE[v7y].word_0x04f_2C2D_11309 = 0;
@@ -22424,7 +22424,7 @@ void ColorizeScreen_2E790(int posX, int posY, int width, int height, uint8_t col
 	{
 		for (int indexX = locPosX; indexX < locWidth + locPosX; indexX++)
 		{
-			pdwScreenBuffer_351628[screenWidth_18062C * indexY + indexX] = x_BYTE_F6EE0_tablesx[0x4000 + 256 * color
+			pdwScreenBuffer_351628[screenWidth_18062C * indexY + indexX] = ColourLookupTable_F6EE0[COLOUR_BLEND_LOOKUP_OFFSET + 256 * color
 				+ pdwScreenBuffer_351628[screenWidth_18062C * indexY + indexX]];
 		}
 	}
@@ -30679,7 +30679,7 @@ int sub_40D10()//221d10//fix vga
 	v30 = (int*)&loc_A0000_vga_buffer;
 	v28 = pdwScreenBuffer_351628;
 	v27 = 200;
-	v29 = x_DWORD_E9C3C;
+	v29 = ptrMemoryBuffer_E9C3C;
 	while (v27)
 	{
 		v2 = 10;
@@ -30864,7 +30864,7 @@ int sub_40D10()//221d10//fix vga
 	memset((void*)pdwScreenBuffer_351628, 0, 0xFA00u);
 	return result;
 }
-// E9C3C: using guessed type int x_DWORD_E9C3C;
+// E9C3C: using guessed type int ptrMemoryBuffer_E9C3C;
 // 180628: using guessed type int pdwScreenBuffer_351628;
 
 //----- (00040F80) --------------------------------------------------------
@@ -30875,7 +30875,7 @@ void BlendAndBlit_40F80()//221f80
 		const int stride = (uint16_t)iScreenWidth_DE560;
 		const int width_dwords = (uint16_t)viewPort.Width_DE564 >> 2;
 		const int half_height = (uint16_t)viewPort.Height_DE568 / 2;
-		uint8_t* scan = x_DWORD_E9C3C;
+		uint8_t* scan = ptrMemoryBuffer_E9C3C;
 		uint8_t* vp = ViewPortRenderBufferStart_DE558;
 		for (int row = half_height; row; row--) {
 			uint8_t* s = scan;
@@ -31361,6 +31361,14 @@ void sub_46830_main_loop(unsigned __int16 actLevel)//227830
 		*/
 		//!!!!test area1
 
+		if (CommandLineParams.DoNetworkDebug()) {
+			static int menuSeenFor = -1;
+			if (menuSeenFor != g_autotest_match) {
+				menuSeenFor = g_autotest_match;
+				debug_net_printf("MATCHEND: entering MenusAndIntros for match %d (skipMenus=%d)\n",
+					g_autotest_match, (int)skipMenus);
+			}
+		}
 		MenusAndIntros_76930(skipMenus);//set language, intro, menu, atd. //257930
 
 		//debug
@@ -31590,6 +31598,26 @@ void sub_46830_main_loop(unsigned __int16 actLevel)//227830
 					break;//must be here
 				}
 			}
+			// The level is over and we are on our way back to the menu.  Give the network
+			// session back here, or the next network game is refused before it sends a
+			// single packet - see NetworkLeaveSession().
+			if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)
+				NetworkLeaveSession();
+
+			if (CommandLineParams.DoNetworkDebug())
+				debug_net_printf("MATCHEND: level torn down, heading for the menu\n");
+
+			// The scoreboard belongs to the match that has just ended, so it is worked out here,
+			// while its numbers still stand.  The menu turns it into a popup when it opens its own
+			// message list; one posted from inside the game would go with the list the menu
+			// deletes on its way out.
+			if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)
+			{
+				g_matchResultPending = MatchScoreResultLine();
+				if (CommandLineParams.DoNetworkDebug())
+					debug_net_printf("MATCHEND: result %s\n", g_matchResultPending.c_str());
+			}
+
 			nextMenu_E29D8 = MenuItem::MainMenu;
 			skipMenus = false;
 			setLevel = -1;
@@ -31741,6 +31769,8 @@ void InGameLoop_47320()//228320
 	const bool useFixedSimulationScheduler = UseFixedSimulationScheduler();
 	gameSimulationScheduler.Reset(simulationFps);
 
+	g_inGameLoop = true;
+
 	while (1)
 	{
 		g_state_monitor.Update();
@@ -31812,6 +31842,7 @@ void InGameLoop_47320()//228320
 			}
 		}
 	}
+	g_inGameLoop = false;
 	//Clear pause status
 	x_D41A0_BYTEARRAY_4_struct.OptionsSettingFlag_24 &= ~GAME_PAUSED;
 
@@ -37681,6 +37712,136 @@ type_entity_0x6E8E* sub_51A00(axis_3d* position)//232a00
 
 int debugcounter_233d56 = 0;
 //----- (00051BB0) --------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Multiplayer scoreboard, for the result line shown when the game ends.
+//
+// Everything here is per match and lives only in memory: the game has no scoring of its own,
+// the player structure carries no counter to hold one, and nothing about a knock-out is sent
+// over the wire beyond the action that caused it.  That is why this is worked out on each node
+// from the same inputs every node already runs - the simulations are in step, so each of them
+// arrives at the same table and the players all see the same result.
+//
+// Order is "who lasted longest": whoever is still standing comes first, then the knocked-out
+// in reverse order of when they went, so the last one to fall is ahead of the first.
+// ---------------------------------------------------------------------------
+static int  matchKills[8];        // opponents this player put down
+static int  matchOutSeq[8];       // order of knock-outs, 0 = never went out
+static bool matchPlayed[8];       // slots that took part at all
+static int  matchOutCounter = 0;
+
+// A player who leaves a network game does not take their castle with them.
+//
+// Nothing used to happen to it: the owner went back to the menu and the castle stayed
+// standing on the map, still theirs, for the rest of the match.  Destroying it is what the
+// game already does when a castle is lost (action 0x2A sets life = -1) and the mana it held
+// is released by the castle's own death, so this only has to say "it is gone".
+//
+// Every node runs this for the same player at the same point - leaving is an action that
+// travels over the wire, and a node that vanished is noticed by all the others - so the
+// castle disappears on every screen without anything extra being sent.
+void DestroyPlayerCastle(int player)
+{
+	if (!(x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)) return;
+	if (player < 0 || player >= 8) return;
+	type_entity_0x6E8E* owner = Entities_EA3E4[D41A0_0.array_0x2BDE[player].playerIndex_0x00a_2BE4_11240];
+	if (!owner || !owner->dword_0xA4_164x) return;
+	const int16_t castle = owner->dword_0xA4_164x->CastleEntityIndex_0x3A_58;
+	if (!castle) return;
+	if (Entities_EA3E4[castle] > Entities_EA3E4[0])
+	{
+		// A stage at a time, the way the game takes a castle apart.  sub_605E0 removes one
+		// level per call and, on the call that brings the count to zero, clears the owner's
+		// castle and stops drawing it - that last step is what makes the castle actually go.
+		//
+		// Setting life = -1 once, which is all action 0x2A does, costs exactly ONE level: a
+		// level 3 castle came back as a level 2 one, which is what the tester saw.
+		if (CommandLineParams.DoNetworkDebug())
+			debug_net_printf("CASTLE: player %d left, taking down its castle (%d level(s))\n",
+				player + 1, (int)Entities_EA3E4[castle]->dword_0x10_16);
+		// Bounded: the loop trusts a counter that lives in game state, and a castle has
+		// nothing like eight levels.
+		int guard = 16;
+		while (Entities_EA3E4[castle] > Entities_EA3E4[0]
+			&& Entities_EA3E4[castle]->dword_0x10_16 > 0 && guard-- > 0)
+		{
+			sub_605E0(Entities_EA3E4[castle]);
+		}
+		// A castle already at level 0 still has to be cleared away, and that is the same call.
+		if (Entities_EA3E4[castle] > Entities_EA3E4[0])
+			sub_605E0(Entities_EA3E4[castle]);
+	}
+}
+
+void MatchScoreReset()
+{
+	for (int i = 0; i < 8; i++) { matchKills[i] = 0; matchOutSeq[i] = 0; matchPlayed[i] = false; }
+	matchOutCounter = 0;
+}
+
+// Both of these are called from paths a single-player game runs too, so they check the mode
+// themselves: the scoreboard exists for the multiplayer result line and must not so much as
+// record anything outside it.
+void MatchScoreMarkPlaying(int player)
+{
+	if (!(x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)) return;
+	if (player >= 0 && player < 8) matchPlayed[player] = true;
+}
+
+// Credits the kill and remembers when the victim went.  The killer is read off the victim:
+// applying damage stores the index of the entity that landed the hit in the victim's
+// word_0x26_38 (see sub_1B6B0, where str_0x5E_94.word_0x62_98 is copied into it), and that
+// entity's owner is the player behind it - directly for a wizard, through the owner index for
+// anything it cast.  A victim that fell to something with no owner (its own doing, terrain)
+// still gets its place in the order; nobody is credited.
+void MatchScoreRecordKnockOut(int victim, type_entity_0x6E8E* victimEntity)
+{
+	if (!(x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)) return;
+	if (victim < 0 || victim >= 8) return;
+	if (matchOutSeq[victim]) return;                 // already counted, this can be re-entered
+	matchPlayed[victim] = true;
+	matchOutSeq[victim] = ++matchOutCounter;
+
+	if (!victimEntity) return;
+	const int16_t hitBy = victimEntity->word_0x26_38;
+	if (hitBy <= 0) return;
+	type_entity_0x6E8E* killerEntity = Entities_EA3E4[hitBy];
+	if (!killerEntity) return;
+	if (!killerEntity->dword_0xA4_164x)              // a projectile: follow it back to its owner
+		killerEntity = Entities_EA3E4[killerEntity->id_0x1A_26];
+	if (!killerEntity || !killerEntity->dword_0xA4_164x) return;
+
+	const int killer = killerEntity->dword_0xA4_164x->playerColorIndex_0x38_56;
+	if (killer < 0 || killer >= 8 || killer == victim) return;   // suicide credits nobody
+	matchKills[killer]++;
+	matchPlayed[killer] = true;
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("SCORE: player %d put down player %d (now %d)\n",
+			killer + 1, victim + 1, matchKills[killer]);
+}
+
+// "Player 1(killed 2), Player 2(killed 0), Player 3(killed 0)"
+std::string MatchScoreResultLine()
+{
+	int order[8], n = 0;
+	for (int i = 0; i < 8; i++) if (matchPlayed[i]) order[n++] = i;
+
+	// Still standing first (their sequence is 0), then the latest knock-out down to the first.
+	for (int a = 0; a < n; a++)
+		for (int b = a + 1; b < n; b++) {
+			const int sa = matchOutSeq[order[a]] ? matchOutSeq[order[a]] : 0x7FFFFFFF;
+			const int sb = matchOutSeq[order[b]] ? matchOutSeq[order[b]] : 0x7FFFFFFF;
+			if (sb > sa) { const int t = order[a]; order[a] = order[b]; order[b] = t; }
+		}
+
+	std::string line;
+	for (int i = 0; i < n; i++) {
+		char part[64];
+		snprintf(part, sizeof(part), "Player %d (killed %d)\n", order[i] + 1, matchKills[order[i]]);
+		line += part;
+	}
+	return line;
+}
+
 void PlayerEvents_51BB0()//232bb0
 {
 	type_entity_0x6E8E* ifsEvent;
@@ -37711,7 +37872,8 @@ void PlayerEvents_51BB0()//232bb0
 			static bool linkDropped = false;
 			if (!linkDropped) {
 				linkDropped = true;
-				debug_net_printf("AUTOTEST: dropping the network link now\n");
+				if (CommandLineParams.DoNetworkDebug())
+					debug_net_printf("AUTOTEST: dropping the network link now\n");
 				EndMyNetLib();
 			}
 		}
@@ -37719,7 +37881,43 @@ void PlayerEvents_51BB0()//232bb0
 			static bool leftGame = false;
 			if (!leftGame) {
 				leftGame = true;
-				debug_net_printf("AUTOTEST: leaving the game now\n");
+				if (CommandLineParams.DoNetworkDebug())
+					debug_net_printf("AUTOTEST: leaving the game now\n");
+				D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].byte_0x004_2BE0_11234 = 1;
+			}
+		}
+	}
+
+	// End this match and go round again, for the multi-match test.
+	//
+	// Deliberately NOT byte_0x004_2BE0_11234, which is what --quit_after sets: that one is
+	// tested at the top of sub_46830_main_loop as well, so it leaves the application
+	// altogether.  Bit 3 of dw_w_b_0_2BDE_11230.byte[2] only breaks InGameLoop_47320, and the
+	// outer while(1) then runs MenusAndIntros_76930 again - which is exactly the path a
+	// player takes back to the menu, and the one that has to rebuild the network state.
+	if ((x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)
+		&& CommandLineParams.AutoTest() && CommandLineParams.AutoTestMatchSeconds() > 0
+		&& CommandLineParams.AutoTestMatches() > 1)
+	{
+		static long matchSince = 0;
+		static int  matchInProgress = -1;
+		if (matchInProgress != g_autotest_match) { matchInProgress = g_autotest_match; matchSince = 0; }
+		if (matchSince == 0) matchSince = (long)j___clock();
+
+		if (((long)j___clock() - matchSince) / 100 >= CommandLineParams.AutoTestMatchSeconds())
+		{
+			if (g_autotest_match + 1 < CommandLineParams.AutoTestMatches())
+			{
+				if (CommandLineParams.DoNetworkDebug())
+					debug_net_printf("AUTOTEST: match %d over, returning to the menu for match %d\n",
+						g_autotest_match, g_autotest_match + 1);
+				g_autotest_match++;
+				D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].dw_w_b_0_2BDE_11230.byte[2] |= 8;
+			}
+			else
+			{
+				if (CommandLineParams.DoNetworkDebug())
+					debug_net_printf("AUTOTEST: last match (%d) over, leaving\n", g_autotest_match);
 				D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].byte_0x004_2BE0_11234 = 1;
 			}
 		}
@@ -37803,6 +38001,9 @@ void PlayerEvents_51BB0()//232bb0
 
 		//adress 232d2f
 		actEvent = Entities_EA3E4[D41A0_0.array_0x2BDE[i].playerIndex_0x00a_2BE4_11240];
+		// Anybody the loop runs for is in this match, which is how the result table knows which
+		// slots to list - the array has eight of them and a game rarely fills it.
+		MatchScoreMarkPlaying(i);
 		if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & 0x20)
 		{
 			sub_53A40(&D41A0_0.playerInputs_0x6E3E[i]);
@@ -37829,6 +38030,8 @@ void PlayerEvents_51BB0()//232bb0
 				D41A0_0.array_0x2BDE[i].byte_0x004_2BE0_11234 = 1;
 			if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)
 				DisableEntitesDrawing_5E660(actEvent);
+			MatchScoreRecordKnockOut(i, actEvent);
+			DestroyPlayerCastle(i);
 			NetworkEvent_7373D(i);
 			D41A0_0.array_0x2BDE[i].byte_0x006_2BE4_11236 = 0;
 			break;
@@ -37876,8 +38079,9 @@ void PlayerEvents_51BB0()//232bb0
 			{
 				strcpy(D41A0_0.array_0x2BDE[i].CurrentNotificationText_0x01c_2BFA_11258, x_DWORD_E9C4C_langindexbuffer[HAS_BEEN_BANISHED]);//has been banished from the realm.
 				D41A0_0.array_0x2BDE[i].word_0x04f_2C2D_11309 = 1;
-				D41A0_0.array_0x2BDE[i].word_0x04d_2C2B_11307 = 100;
+				D41A0_0.array_0x2BDE[i].CurrentNotificationDuration_0x04d_2C2B_11307 = 100;
 				D41A0_0.array_0x2BDE[i].dw_w_b_0_2BDE_11230.word[1] = 8;
+				MatchScoreRecordKnockOut(i, actEvent);
 				NetworkEvent_7373D(i);
 				D41A0_0.array_0x2BDE[i].byte_0x006_2BE4_11236 = 0;
 				if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE)
@@ -37901,6 +38105,20 @@ void PlayerEvents_51BB0()//232bb0
 				SetCenterScreenForFlyAssistant_6EDB0();
 			}
 			SetMenuCursorPosition_52E90(&D41A0_0.array_0x2BDE[i], 3, true);
+			// Opening the panel starts a fresh message, so the slot it types into starts empty.
+			//
+			// Sending (0x13) leaves the text in names_81, and only zeroing the counter here
+			// meant the box came back up showing the message just sent, with the caret at the
+			// end of it - the text looked editable, but the first keypress dropped the whole
+			// line (loc_520C4 below: names_81[slot][0] = 0 while the counter is still 0).  That
+			// deferred wipe is what players report as "the previous message is still there and
+			// it blanks as I start typing".  Clearing here makes the box show what typing will
+			// actually produce.
+			//
+			// The eight slots stay usable: selecting one (0x23) does NOT clear, so picking a
+			// slot with Shift+F1..F8 and pressing Enter still sends what is stored in it.  Only
+			// the slot the panel opens on is treated as the scratch line.
+			D41A0_0.array_0x2BDE[i].names_81[D41A0_0.array_0x2BDE[i].byte_0x3E0_2BE4_12222][0] = 0;
 			D41A0_0.array_0x2BDE[i].byte_0x3E2_2BE4_12224 = 0;
 			if (i == D41A0_0.LevelIndex_0xc)
 			{
@@ -37994,7 +38212,7 @@ void PlayerEvents_51BB0()//232bb0
 		case 0x1D: //Banished
 			strcpy(D41A0_0.array_0x2BDE[i].CurrentNotificationText_0x01c_2BFA_11258, x_DWORD_E9C4C_langindexbuffer[HAS_BEEN_BANISHED]);//has been banished from the realm.
 			D41A0_0.array_0x2BDE[i].word_0x04f_2C2D_11309 = 1;
-			D41A0_0.array_0x2BDE[i].word_0x04d_2C2B_11307 = 100;
+			D41A0_0.array_0x2BDE[i].CurrentNotificationDuration_0x04d_2C2B_11307 = 100;
 			D41A0_0.array_0x2BDE[i].dw_w_b_0_2BDE_11230.word[1] = 8;//SKIP FROM GAMELOOP
 			NetworkEvent_7373D(i);
 			D41A0_0.array_0x2BDE[i].byte_0x006_2BE4_11236 = 0;
@@ -38146,7 +38364,7 @@ void PlayerEvents_51BB0()//232bb0
 				if (i == D41A0_0.LevelIndex_0xc)
 				{
 					strcpy(D41A0_0.array_0x2BDE[i].CurrentNotificationText_0x01c_2BFA_11258, x_DWORD_E9C4C_langindexbuffer[SPELLS_BEGIN_BUFFER_str[spellIndex].subspell[D41A0_0.playerInputs_0x6E3E[i].str_0x6E3E_byte2].hintText_0x16x]);
-					D41A0_0.array_0x2BDE[i].word_0x04d_2C2B_11307 = 20;
+					D41A0_0.array_0x2BDE[i].CurrentNotificationDuration_0x04d_2C2B_11307 = 20;
 					D41A0_0.array_0x2BDE[i].word_0x04f_2C2D_11309 = 3;
 				}
 				if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & 4)
@@ -38233,7 +38451,23 @@ void PlayerEvents_51BB0()//232bb0
 					&& x_toupper(printbuffer[3]) == 'D'
 					&& x_toupper(printbuffer[4]) == 'Y')
 				{
-					if (i == D41A0_0.LevelIndex_0xc)
+					// WINDY is a single-player cheat and is ignored in a network game.
+					//
+					// Setting the top bit turns setting_byte2_23 (an int8_t) negative, and every
+					// "setting_byte2_23 < 0" test in PlayerInput.cpp is that byte being read as
+					// "cheats are on" - it hands out the debug keys, and it also lifts the castle
+					// experience gate in EventsFunctions.  None of that is exchanged with anyone:
+					// the other players neither agree to it nor ever find out, so one node would
+					// be playing by rules of its own while the rest keep to the game's.  There is
+					// already one key excluded from multiplayer this way (PlayerInput.cpp, the
+					// "setting_byte2_23 < 0 && !MULTIPLAYER_MODE" test); this is the same reason
+					// applied at the source.
+					//
+					// The word is still recognised and swallowed rather than passed on, so typing
+					// it in a network game does nothing at all - it is not broadcast as an
+					// ordinary chat line either.
+					if (i == D41A0_0.LevelIndex_0xc
+						&& !(x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE))
 						x_D41A0_BYTEARRAY_4_struct.setting_byte2_23 |= 0x80u;
 				}
 				else
@@ -38275,7 +38509,7 @@ void PlayerEvents_51BB0()//232bb0
 					if (bool1)
 					{
 						strcpy(D41A0_0.array_0x2BDE[i].CurrentNotificationText_0x01c_2BFA_11258, printbuffer);
-						D41A0_0.array_0x2BDE[i].word_0x04d_2C2B_11307 = 200;
+						D41A0_0.array_0x2BDE[i].CurrentNotificationDuration_0x04d_2C2B_11307 = 200;
 						D41A0_0.array_0x2BDE[i].word_0x04f_2C2D_11309 = 2;
 					}
 				}
@@ -39272,6 +39506,13 @@ void write_pngs()
 }
 
 //----- (00056210) --------------------------------------------------------
+static int ClampPort(int port)
+{
+	if (port < 0) return 0;
+	if (port > 99999) return 99999;
+	return port;
+}
+
 void sub_56210_process_command_line(int argc, char** argv)//237210
 {
 	int32_t x_DWORD_355208;//3551CE+3A DWORD
@@ -39427,27 +39668,26 @@ void sub_56210_process_command_line(int argc, char** argv)//237210
 			{
 				x_BYTE_355238_music2 = 1;
 			}
-			else if (!_stricmp("client", (char*)actarg))//set to all one computer adress
+			// client <server ip> <server port> <own port>
+			else if (!_stricmp("client", (char*)actarg))
 			{
 				Iam_client = true;
 				strcpy(serverIP, (char*)argv[++argnumber]);
-				ServerPort = atoi(argv[++argnumber]);
-				if (ServerPort < 0)ServerPort = 0;
-				if (ServerPort > 99999)ServerPort = 99999;
-				NetworkPort = atoi(argv[++argnumber]);
-				if (NetworkPort < 0)
-					NetworkPort = 0;
-				if (NetworkPort > 99999)
-					NetworkPort = 99999;
+				ServerPort = ClampPort(atoi(argv[++argnumber]));
+				NetworkPort = ClampPort(atoi(argv[++argnumber]));
 			}
-			else if (!_stricmp("server", (char*)actarg))//set to all one computer adress
+			// server <own port> - and nothing else.  The host holds one port, which serves
+			// both the control traffic it answers and the game data it exchanges, so there is
+			// nothing left to say: its address is loopback and its data port is that same
+			// port.  It used to need a "client 127.0.0.1 <same port> <another port>" after
+			// this, which named the host twice and gave it a second port to keep track of.
+			else if (!_stricmp("server", (char*)actarg))
 			{
 				Iam_server = true;
-				ServerPort = atoi(argv[++argnumber]);
-				if (ServerPort < 0)
-					ServerPort = 0;
-				if (ServerPort > 99999)
-					ServerPort = 99999;
+				Iam_client = true;              // the host plays too, through its own server
+				ServerPort = ClampPort(atoi(argv[++argnumber]));
+				NetworkPort = ServerPort;
+				strcpy(serverIP, "127.0.0.1");
 			}
 		}
 		argnumber++;
@@ -39586,6 +39826,14 @@ void ClearSettings_567C0()//2377c0 // clean level
 //----- (00056A30) --------------------------------------------------------
 void LevelInitGame_56A30(int16_t level, std::string customLevelPath)//237a30
 {
+	// The game that is starting owns the scoreboard from here, and the result of the previous
+	// one has been read by now - this is what "hangs there until the next game" means.
+	//
+	// Not at NetworkInitConnection_7308F, which is where it first went: that runs when the
+	// player enters the multiplayer session menu, 300 ms after the level was torn down, so the
+	// result was wiped before the menu ever drew it.
+	MatchScoreReset();
+
 	if (CommandLineParams.DoMouseOff()) { mouseturnoff = true; }
 	if (level > -1) {
 		x_D41A0_BYTEARRAY_4_struct.levelnumber_43w = (uint16_t)level;
@@ -41135,7 +41383,7 @@ void sub_58F00_game_objectives()//239f00
 					{
 						if (x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 & Setting::MULTIPLAYER_MODE && (x_WORD)v24 != D41A0_0.LevelIndex_0xc)
 						{
-							D41A0_0.array_0x2BDE[v24].word_0x04d_2C2B_11307 = 60;
+							D41A0_0.array_0x2BDE[v24].CurrentNotificationDuration_0x04d_2C2B_11307 = 60;
 							D41A0_0.array_0x2BDE[v24].word_0x04f_2C2D_11309 = 4;
 							if (v14)
 								sprintf(D41A0_0.array_0x2BDE[v24].CurrentNotificationText_0x01c_2BFA_11258, "%s", (char*)x_DWORD_E9C4C_langindexbuffer[431]);//Has Completed All Objectives.
@@ -46775,18 +47023,23 @@ bool DrawFrameAnim_7E5A0(__int16 posx, __int16 posy, Type_MapScreenPortals_E17CC
 	return result;
 }
 
+void DrawTextBox(std::string message, uint16_t left, uint16_t right, uint16_t top, int16_t borderColour)
+{
+	DrawTextWithBoarder_7FCB0((char*)message.c_str(), left, right, top, 0, 0, borderColour);
+}
+
 //----- (0007E840) --------------------------------------------------------
-void sub_7E840_draw_textbox_with_line(typeTextBoxtextBoxStr_E24BCx* testBoxStr, __int16 borderColor, __int16 lineColor)//25f840
+void DrawTextBoxWithLine_7E840(typeTextBoxtextBoxStr_E24BCx* testBoxStr, __int16 borderColor, __int16 lineColor)//25f840
 {
 	int i = 0;
-	if (!testBoxStr[i].minx2_2)
+	if (!testBoxStr[i].left_2)
 		return;
 	do
 	{
-		if (testBoxStr[i].minx2_2)
+		if (testBoxStr[i].left_2)
 		{
-			sub_81360_draw_bitmap_line(testBoxStr[i].minx_6, testBoxStr[i].miny_8, testBoxStr[i].maxx_12, testBoxStr[i].maxy_14, lineColor);//262360
-			sub_7FCB0_draw_text_with_border(x_DWORD_E9C4C_langindexbuffer[testBoxStr[i].textIndex_0], testBoxStr[i].minx2_2, (testBoxStr[i].minx2_2 + 180), testBoxStr[i].miny2_4, 0, 0, borderColor);//260cb0
+			DrawBitmapLine_81360(testBoxStr[i].minx_6, testBoxStr[i].miny_8, testBoxStr[i].width_12, testBoxStr[i].maxy_14, lineColor);//262360
+			DrawTextWithBoarder_7FCB0(x_DWORD_E9C4C_langindexbuffer[testBoxStr[i].textIndex_0], testBoxStr[i].left_2, (testBoxStr[i].left_2 + 180), testBoxStr[i].top_4, 0, 0, borderColor);//260cb0
 			/*
 			Save Current Game
 			Exit Game
@@ -46807,7 +47060,7 @@ void sub_7E840_draw_textbox_with_line(typeTextBoxtextBoxStr_E24BCx* testBoxStr, 
 			*/
 		}
 		i++;
-	} while (testBoxStr[i].minx2_2);
+	} while (testBoxStr[i].left_2);
 }
 
 //----- (0007E8D0) --------------------------------------------------------
@@ -46966,7 +47219,7 @@ int DrawMapObject_812D0(__int16 a1, __int16 a2)//2622d0
 }
 
 //----- (00081360) --------------------------------------------------------
-void sub_81360_draw_bitmap_line(int16_t minx, int16_t miny, int16_t maxx, int16_t maxy, __int16 a5)//262360
+void DrawBitmapLine_81360(int16_t minx, int16_t miny, int16_t maxx, int16_t maxy, __int16 a5)//262360
 {
 	int32_t v5; // edi
 	int32_t v6; // esi
@@ -52227,13 +52480,13 @@ int16_t sub_90B27_VGA_pal_fadein_fadeout(TColor* newpalbufferx, uint8_t shadow_l
 	{
 		if (x_BYTE_E390C_VGA_pal_not_begin)
 		{
-			x_WORD_181B44++;
-			if (shadow_levels == x_WORD_181B44)
+			CurrentPaletteFade_181B44++;
+			if (shadow_levels == CurrentPaletteFade_181B44)
 				x_BYTE_E390C_VGA_pal_not_begin = 0;
 		}
 		else
 		{
-			x_WORD_181B44 = 0;
+			CurrentPaletteFade_181B44 = 0;
 			x_BYTE_E390C_VGA_pal_not_begin = 1;
 			sub_A0D2C_VGA_get_Palette(x_BYTE_181544_oldpalbufferx);
 			if (!newpalbufferx)
@@ -52249,9 +52502,9 @@ int16_t sub_90B27_VGA_pal_fadein_fadeout(TColor* newpalbufferx, uint8_t shadow_l
 			//LOWORD(v6) = x_BYTE_181544_oldpalbuffer[i];
 			//v10 = &v5[-v6];
 			//outbuffer[i] = x_BYTE_181544_oldpalbuffer[i] + ((unk_181B42 >> 16)* (newpalbuffer[i] - x_BYTE_181544_oldpalbuffer[i])/ shadow_levels);
-			outbufferx[i].red = x_BYTE_181544_oldpalbufferx[i].red + ((x_WORD_181B44) * (newpalbufferx[i].red - x_BYTE_181544_oldpalbufferx[i].red) / shadow_levels);
-			outbufferx[i].green = x_BYTE_181544_oldpalbufferx[i].green + ((x_WORD_181B44) * (newpalbufferx[i].green - x_BYTE_181544_oldpalbufferx[i].green) / shadow_levels);
-			outbufferx[i].blue = x_BYTE_181544_oldpalbufferx[i].blue + ((x_WORD_181B44) * (newpalbufferx[i].blue - x_BYTE_181544_oldpalbufferx[i].blue) / shadow_levels);
+			outbufferx[i].red = x_BYTE_181544_oldpalbufferx[i].red + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].red - x_BYTE_181544_oldpalbufferx[i].red) / shadow_levels);
+			outbufferx[i].green = x_BYTE_181544_oldpalbufferx[i].green + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].green - x_BYTE_181544_oldpalbufferx[i].green) / shadow_levels);
+			outbufferx[i].blue = x_BYTE_181544_oldpalbufferx[i].blue + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].blue - x_BYTE_181544_oldpalbufferx[i].blue) / shadow_levels);
 		}
 		//sub_9A0FC_wait_to_screen_beam();
 		sub_41A90_VGA_Palette_install(outbufferx);
@@ -52266,7 +52519,7 @@ int16_t sub_90B27_VGA_pal_fadein_fadeout(TColor* newpalbufferx, uint8_t shadow_l
 			newpalbufferx = zero_bufferx;
 			memset(zero_bufferx, 0, 768);
 		}
-		for (x_WORD_181B44 = 0; x_WORD_181B44 < shadow_levels; x_WORD_181B44++)
+		for (CurrentPaletteFade_181B44 = 0; CurrentPaletteFade_181B44 < shadow_levels; CurrentPaletteFade_181B44++)
 		{
 			for (i = 0; i < 0x100; i++)
 			{
@@ -52288,9 +52541,9 @@ int16_t sub_90B27_VGA_pal_fadein_fadeout(TColor* newpalbufferx, uint8_t shadow_l
 				//v4 = x_BYTE_181544_oldpalbuffer[i];
 				//v10 = &v3[-v4];
 				//outbuffer[i] = x_BYTE_181544_oldpalbuffer[i] + ((unk_181B42 >> 16) * (newpalbuffer[i] - x_BYTE_181544_oldpalbuffer[i]) / shadow_levels);//352b42 352544
-				outbufferx[i].red = x_BYTE_181544_oldpalbufferx[i].red + ((x_WORD_181B44) * (newpalbufferx[i].red - x_BYTE_181544_oldpalbufferx[i].red) / shadow_levels);//352b42 352544
-				outbufferx[i].green = x_BYTE_181544_oldpalbufferx[i].green + ((x_WORD_181B44) * (newpalbufferx[i].green - x_BYTE_181544_oldpalbufferx[i].green) / shadow_levels);//352b42 352544
-				outbufferx[i].blue = x_BYTE_181544_oldpalbufferx[i].blue + ((x_WORD_181B44) * (newpalbufferx[i].blue - x_BYTE_181544_oldpalbufferx[i].blue) / shadow_levels);//352b42 352544
+				outbufferx[i].red = x_BYTE_181544_oldpalbufferx[i].red + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].red - x_BYTE_181544_oldpalbufferx[i].red) / shadow_levels);//352b42 352544
+				outbufferx[i].green = x_BYTE_181544_oldpalbufferx[i].green + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].green - x_BYTE_181544_oldpalbufferx[i].green) / shadow_levels);//352b42 352544
+				outbufferx[i].blue = x_BYTE_181544_oldpalbufferx[i].blue + ((CurrentPaletteFade_181B44) * (newpalbufferx[i].blue - x_BYTE_181544_oldpalbufferx[i].blue) / shadow_levels);//352b42 352544
 			}
 			//sub_9A0FC_wait_to_screen_beam();
 			sub_41A90_VGA_Palette_install(outbufferx);
@@ -52304,7 +52557,7 @@ int16_t sub_90B27_VGA_pal_fadein_fadeout(TColor* newpalbufferx, uint8_t shadow_l
 		VGA_Init();
 	}*/
 	//return 0;
-	return x_WORD_181B44;
+	return CurrentPaletteFade_181B44;
 }
 
 //----- (00090B27) --------------------------------------------------------
@@ -52323,12 +52576,12 @@ __int16 sub_90B27_VGA_pal_fadein_fadeout_orig(char*  /*a1*/, unsigned __int8  /*
   {
 	if ( x_BYTE_E390C_VGA_pal_not_begin )
 	{
-	  if ( a2 == ++x_WORD_181B44 )
+	  if ( a2 == ++CurrentPaletteFade_181B44 )
 		x_BYTE_E390C_VGA_pal_not_begin = 0;
 	}
 	else
 	{
-	  x_WORD_181B44 = 0;
+	  CurrentPaletteFade_181B44 = 0;
 	  x_BYTE_E390C_VGA_pal_not_begin = 1;
 	  sub_A0D2C_VGA_get_Palette(x_BYTE_181544_oldpalbuffer);
 	  if ( !a1 )
@@ -52359,7 +52612,7 @@ __int16 sub_90B27_VGA_pal_fadein_fadeout_orig(char*  /*a1*/, unsigned __int8  /*
 	  a1 = (char *)&unk_181844;
 	  memset(&unk_181844, 0, 768);
 	}
-	for ( x_WORD_181B44 = 0; a2 >= x_WORD_181B44; ++x_WORD_181B44 )
+	for ( CurrentPaletteFade_181B44 = 0; a2 >= CurrentPaletteFade_181B44; ++CurrentPaletteFade_181B44 )
 	{
 	  for ( i = 0; (signed __int16)i < 768; i++ )
 	  {
@@ -52378,12 +52631,12 @@ __int16 sub_90B27_VGA_pal_fadein_fadeout_orig(char*  /*a1*/, unsigned __int8  /*
 	}
 	x_BYTE_E390C_VGA_pal_not_begin = 0;
   }
-  return x_WORD_181B44;*/
+  return CurrentPaletteFade_181B44;*/
 	return 0;
 }
 // 8C250: using guessed type x_DWORD memset(x_DWORD, x_DWORD, x_DWORD);
 // E390C: using guessed type char x_BYTE_E390C_VGA_pal_not_begin;
-// 181B44: using guessed type __int16 x_WORD_181B44;
+// 181B44: using guessed type __int16 CurrentPaletteFade_181B44;
 // 90B27: using guessed type char var_30C[768];
 
 //----- (00090D27) --------------------------------------------------------
@@ -54151,7 +54404,7 @@ void sub_BD1B6(uint8_t* a1)
 	sub_9951B(0);
 	//v57 = 4096;
 	savedregs = 4096;
-	v2 = sub_BD320(0, (int8_t*)pdwScreenBuffer_351628, (int8_t*)x_DWORD_E9C3C, 0, savedregs, a1);
+	v2 = sub_BD320(0, (int8_t*)pdwScreenBuffer_351628, (int8_t*)ptrMemoryBuffer_E9C3C, 0, savedregs, a1);
 	v7 = v4;
 	v6 = v3;
 	v5 = v2;
@@ -54241,7 +54494,7 @@ void /*__spoils<ecx>*/ sub_BD2CB(uint8_t* a1)//29e2cb
 	sub_9951B(0);
 	//v9 = 4096;
 	savedregs = 4096;
-	v2 = sub_BD320(0, (int8_t*)pdwScreenBuffer_351628, (int8_t*)x_DWORD_E9C3C, 0, savedregs, a1);
+	v2 = sub_BD320(0, (int8_t*)pdwScreenBuffer_351628, (int8_t*)ptrMemoryBuffer_E9C3C, 0, savedregs, a1);
 	v7 = v4;
 	v6 = v3;
 	v5 = v2;
@@ -60412,7 +60665,7 @@ void sub_5E310_multiplayer_test_die(type_entity_0x6E8E* a1x)//23f310
 			v15 += 2;
 		} while (v17);*/
 		D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].word_0x04f_2C2D_11309 = 1;
-		D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].word_0x04d_2C2B_11307 = 100;
+		D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].CurrentNotificationDuration_0x04d_2C2B_11307 = 100;
 		for (i = 0; i < 26; i++)
 		{
 			//v18 = a1x->dword_0xA4_164 + 2 * i;
@@ -60573,8 +60826,12 @@ void sub_5E7C0_multiplayer_test_banished(type_entity_0x6E8E* a1x)//23f7c0
 	v6 += 2;
 } while ((x_BYTE)v1);*/
 				D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].word_0x04f_2C2D_11309 = 1;
-				D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].word_0x04d_2C2B_11307 = 200;
+				D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].CurrentNotificationDuration_0x04d_2C2B_11307 = 200;
 			}
+			// An AI opponent leaving the realm counts on the scoreboard exactly like a human
+			// one: it holds a player slot, and whoever put it down gets the kill.  Its way out
+			// is here rather than through PlayerEvents, which is why it needs its own hook.
+			MatchScoreRecordKnockOut(a1x->dword_0xA4_164x->playerColorIndex_0x38_56, a1x);
 			D41A0_0.array_0x2BDE[a1x->dword_0xA4_164x->playerColorIndex_0x38_56].byte_0x006_2BE4_11236 = 0;
 		}
 	}
@@ -60725,7 +60982,7 @@ signed int sub_5E8C0_endGameSeq(type_entity_0x6E8E* a1x)//23f8c0 //end game sequ
 				a1x->byte_0x46_70 = 6;
 			else
 				a1x->byte_0x46_70 = 8;
-			if (x_DWORD_E9C3C && (D41A0_0.terrain_2FECE.MapType == MapType_t::Day))
+			if (ptrMemoryBuffer_E9C3C && (D41A0_0.terrain_2FECE.MapType == MapType_t::Day))
 			{
 				StopCdPlayback_86860(x_WORD_1803EC);
 				sprintf(dataPath, "%s/%s", cdDataPath.c_str(), "DATA/GTD2.DAT");
@@ -60829,7 +61086,7 @@ signed int sub_5E8C0_endGameSeq(type_entity_0x6E8E* a1x)//23f8c0 //end game sequ
 		if (a1x->dword_0xA4_164x->playerColorIndex_0x38_56 == D41A0_0.LevelIndex_0xc)
 		{
 			PrepareEventSound_6E450(a1x - D41A0_0.struct_0x6E8E, -1, 19);
-			if (x_DWORD_E9C3C)
+			if (ptrMemoryBuffer_E9C3C)
 			{
 				//v22 = (int)x_D41A0_BYTEARRAY_0;
 				D41A0_0.str_0x21AE.xxxx_0x21B1 = 1;
@@ -60868,7 +61125,7 @@ signed int sub_5E8C0_endGameSeq(type_entity_0x6E8E* a1x)//23f8c0 //end game sequ
 }
 // D41A0: using guessed type int x_D41A0_BYTEARRAY_0;
 // D41A4: using guessed type int x_DWORD_D41A4;
-// E9C3C: using guessed type int x_DWORD_E9C3C;
+// E9C3C: using guessed type int ptrMemoryBuffer_E9C3C;
 // EA3E4: using guessed type int Entities_EA3E4[];
 // EB398: using guessed type __int16 x_WORD_EB398;
 // 1803EC: using guessed type __int16 x_WORD_1803EC;

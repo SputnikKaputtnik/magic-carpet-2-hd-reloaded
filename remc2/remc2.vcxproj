@@ -259,7 +259,9 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OmitFramePointers>false</OmitFramePointers>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
-      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <!-- The only configuration in this project that was missing /utf-8; spdlog's base.h
+           refuses to compile without it. -->
+      <AdditionalOptions>/Zc:__cplusplus /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
@@ -405,7 +407,6 @@
     <ClInclude Include="engine\GameUiConstants.h" />
     <ClInclude Include="engine\Graphics.h" />
     <ClInclude Include="engine\GameRenderInterface.h" />
-    <ClInclude Include="engine\GameRenderGL.h" />
     <ClInclude Include="engine\GameRenderHD.h" />
     <ClInclude Include="engine\GameRenderNG.h" />
     <ClInclude Include="engine\globals.h" />
@@ -421,7 +422,7 @@
     <ClInclude Include="engine\GameRenderOriginal.h" />
     <ClInclude Include="engine\MenuState.h" />
     <ClInclude Include="engine\Network.h" />
-    <ClInclude Include="engine\ProjectionPolygon.h" />
+    <ClInclude Include="engine\ProjectionVertex.h" />
     <ClInclude Include="engine\Scene.h" />
     <ClInclude Include="engine\WavIndexes.h" />
     <ClInclude Include="engine\ReadAndDecompress.h" />
@@ -512,7 +513,6 @@
     <ClCompile Include="engine\DatTabIndexes.cpp" />
     <ClCompile Include="engine\EventsFunctions.cpp" />
     <ClCompile Include="engine\GameBitmap.cpp" />
-    <ClCompile Include="engine\GameRenderGL.cpp" />
     <ClCompile Include="engine\GameRenderHD.cpp" />
     <ClCompile Include="engine\GameRenderNG.cpp" />
     <ClCompile Include="engine\LevelInit.cpp" />
@@ -523,7 +523,7 @@
     <ClCompile Include="engine\MouseOnOff.cpp" />
     <ClCompile Include="engine\Network.cpp" />
     <ClCompile Include="engine\PrintMessages.cpp" />
-    <ClCompile Include="engine\ProjectionPolygon.cpp" />
+    <ClCompile Include="engine\ProjectionVertex.cpp" />
     <ClCompile Include="engine\ReadAndDecompress.cpp" />
     <ClCompile Include="engine\ScreenBuff.cpp" />
     <ClCompile Include="engine\Sound.cpp" />

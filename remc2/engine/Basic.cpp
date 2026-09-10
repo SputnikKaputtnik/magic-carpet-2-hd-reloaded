@@ -4,6 +4,7 @@
 #include "GameBitmap.h"
 
 #include <algorithm>
+#include "../portability/port_net.h"
 
 std::string gameDataPath;
 std::string cdDataPath;
@@ -33,7 +34,7 @@ float m_fTimeElapsed = 0.0f; // The time that has elapsed so far
 int m_iFrameCount = 0; // The number of frames that have occurred.
 float m_fFps; // The frames rendered per second. Needs to be stored to be shown every frame.
 
-uint8_t* x_DWORD_E9C3C; // weak
+uint8_t* ptrMemoryBuffer_E9C3C; // weak
 
 uint8_t* x_DWORD_17DB50; // weak
 
@@ -121,9 +122,9 @@ uint8_t keyColor1_D4B7C = 0xfe; // some key color?
 uint8_t keyColor2_D4B7E = 0x00; // some key color?
 type_entity_0x6E8E* Entities_EA3E4[1001];//2bb3e4
 
-uint8_t x_BYTE_F6EE0_tablesx[83456];// (uint8_t*)&x_BYTE_F6EE0_tablesbuff;//animated sprites
-uint8_t* x_BYTE_F6EE0_tablesx_pre = (uint8_t*)x_BYTE_F6EE0_tablesx;
-uint8_t* x_BYTE_FAEE0_tablesx_pre = (uint8_t*)&x_BYTE_F6EE0_tablesx[16384];
+uint8_t ColourLookupTable_F6EE0[83456];// (uint8_t*)&x_BYTE_F6EE0_tablesbuff;//animated sprites
+uint8_t* x_BYTE_F6EE0_tablesx_pre = (uint8_t*)ColourLookupTable_F6EE0;
+uint8_t* x_BYTE_FAEE0_tablesx_pre = (uint8_t*)&ColourLookupTable_F6EE0[COLOUR_BLEND_LOOKUP_OFFSET];
 
 type_E9C38_smalltit Str_E9C38_smalltit[TILE_ROWS_COUNT * TILE_COLUMNS_COUNT];
 
@@ -346,6 +347,8 @@ Pathstruct xadatatables = { "",(uint8_t**)&x_DWORD_D41BC_langbuffer,&LANG_BEGIN_
 //#define psxadatalangbuffer2 46
 //zero
 //#define psxazero14 47
+
+std::vector<Type_Message*>* m_Messages = nullptr;
 
 bool IsDefaultResolution320(int width, int height)
 {
@@ -657,7 +660,7 @@ void sub_2EBB0_draw_text_with_border_630x340(char* textString)//20fbb0
 		x_DWORD_D41D0 = textString;
 		x_WORD_E36D4 = 64;
 		pdwScreenBuffer_351628 += 0x26C0;
-		/*result = */sub_7FCB0_draw_text_with_border(/*64,*/ textString, 0, 630, 340, 5, x_BYTE_EB3B6, 0);
+		/*result = */DrawTextWithBoarder_7FCB0(/*64,*/ textString, 0, 630, 340, 5, x_BYTE_EB3B6, 0);
 		x_WORD_E36D4 = 0;
 		pdwScreenBuffer_351628 -= 0x26C0;
 	}
@@ -665,7 +668,7 @@ void sub_2EBB0_draw_text_with_border_630x340(char* textString)//20fbb0
 }
 
 //----- (0007FCB0) --------------------------------------------------------
-void sub_7FCB0_draw_text_with_border(char* textString, int32_t a3, int32_t a4, int a5, uint8_t a6, unsigned __int8 a7, uint32_t a8)//260cb0
+void DrawTextWithBoarder_7FCB0(char* textString, int32_t a3, int32_t a4, int a5, uint8_t a6, unsigned __int8 a7, uint32_t a8)//260cb0
 {
 	int v8; // esi
 	signed __int16 j; // di
@@ -1447,6 +1450,8 @@ void sub_75200_VGA_Blit640(uint16_t height, uint8_t maxFps)//256200
 #if _DEBUG
 	VGA_CalculateAndPrintFps(0, 0, timeDelta.count());
 #endif
+	VGA_DrawMessages();
+	// Not inside the _DEBUG block above: this one is for players, not for us.
 	DrawFpsOverlay(static_cast<float>(timeDelta.count()));
 	VGA_Blit(pdwScreenBuffer_351628);
 
@@ -1465,6 +1470,7 @@ void VGA_BlitAny(uint8_t maxFps)//256200
 	VGA_CalculateAndPrintFps(0, 0, timeDelta.count());
 	VGA_DrawPlayerCoordData(0, 16);
 #endif
+	VGA_DrawMessages();
 	DrawFpsOverlay(static_cast<float>(timeDelta.count()));
 	VGA_Blit(pdwScreenBuffer_351628);
 
@@ -1494,7 +1500,7 @@ void DrawBitmap_2BB40(int16_t posx, int16_t posy, bitmap_pos_struct_t tempposstr
 	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)
 	{
 		temp_screen_buffer = pdwScreenBuffer_351628;
-		pdwScreenBuffer_351628 = x_DWORD_E9C3C;
+		pdwScreenBuffer_351628 = ptrMemoryBuffer_E9C3C;
 		if (x_WORD_180660_VGA_type_resolution & 1)
 			drawBitmap320_8F8B0(posx, posy, tempposstr);
 		else
@@ -1523,7 +1529,7 @@ void DrawBitmapStretched(
 	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)
 	{
 		uint8_t* temp_screen_buffer = pdwScreenBuffer_351628;
-		pdwScreenBuffer_351628 = x_DWORD_E9C3C;
+		pdwScreenBuffer_351628 = ptrMemoryBuffer_E9C3C;
 		GameBitmap::DrawBitmapStretched(
 			bitmap, pdwScreenBuffer_351628, screenWidth_18062C,
 			destinationLeft, destinationTop, destinationRight, destinationBottom);
@@ -1552,7 +1558,7 @@ void DrawLine_2BC80(int16_t posStartX, int16_t posStartY, int16_t posEndX, int16
 	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)
 	{
 		temp_screen_buffer = pdwScreenBuffer_351628;
-		pdwScreenBuffer_351628 = x_DWORD_E9C3C;
+		pdwScreenBuffer_351628 = ptrMemoryBuffer_E9C3C;
 		if (x_WORD_180660_VGA_type_resolution & 1)
 			DrawLineLowRes_90164(posStartX, posStartY, posEndX, posEndY, colorIdx);
 		else
@@ -1562,7 +1568,7 @@ void DrawLine_2BC80(int16_t posStartX, int16_t posStartY, int16_t posEndX, int16
 	}
 }
 // D41A0: using guessed type int x_D41A0_BYTEARRAY_0;
-// E9C3C: using guessed type int x_DWORD_E9C3C;
+// E9C3C: using guessed type int ptrMemoryBuffer_E9C3C;
 // 180628: using guessed type int pdwScreenBuffer_351628;
 // 180660: using guessed type __int16 x_WORD_180660_VGA_type_resolution;
 
@@ -1573,7 +1579,7 @@ void DrawText_2BC10(const char* textbuffer, int16_t posx, int16_t posy, uint8_t 
 	if (D41A0_0.m_GameSettings.m_Display.m_uiScreenSize == 1)//shifted graphics
 	{
 		uint8_t* temp_screen_buffer = pdwScreenBuffer_351628;
-		pdwScreenBuffer_351628 = x_DWORD_E9C3C;
+		pdwScreenBuffer_351628 = ptrMemoryBuffer_E9C3C;
 		sub_6F940_sub_draw_text(textbuffer, posx, posy, color, scale);
 		pdwScreenBuffer_351628 = temp_screen_buffer;
 	}	
@@ -1695,6 +1701,49 @@ void VGA_CalculateAndPrintFps(int x, int y, float timeDelta)
 	VGA_Draw_stringXYtoBuffer(fpsStr.c_str(), x, y, pdwScreenBuffer_351628);
 }
 
+void AddMessage(Type_Message* message)
+{
+	if (m_Messages != nullptr)
+	{
+		m_Messages->push_back(message);
+	}
+}
+
+void ClearMessages()
+{
+	if (m_Messages != nullptr && !m_Messages->empty())
+	{
+		m_Messages->clear();
+	}
+}
+
+void VGA_DrawMessages()
+{
+	if (m_Messages != nullptr && !m_Messages->empty())
+	{
+		int i = 0;
+		for (auto& message : *m_Messages)
+		{
+			// Below zero means "until somebody takes it down" - the result of a finished game
+			// hangs there through the menu until the next match starts.  Counting it down would
+			// wrap it back to positive eventually, so it is left alone.
+			if (message->Duration > 0)
+				message->Duration--;
+			if (message->Duration != 0)
+				VGA_Draw_stringXYtoBuffer(message->Message.c_str(), 0, i * 16, pdwScreenBuffer_351628);
+
+		}
+
+		m_Messages->erase(
+			std::remove_if(m_Messages->begin(), m_Messages->end(),
+				[](Type_Message* message)
+				{
+					return message->Duration == 0;   // negative ones stay
+				}),
+			m_Messages->end());
+	}
+}
+
 void VGA_DrawPlayerCoordData(int x, int y)
 {
 	if (Entities_EA3E4 != nullptr && Entities_EA3E4[D41A0_0.array_0x2BDE[D41A0_0.LevelIndex_0xc].playerIndex_0x00a_2BE4_11240] != nullptr) {
@@ -1738,7 +1787,7 @@ void LockFps(uint8_t maxFps)
 }
 
 // D41A0: using guessed type int x_D41A0_BYTEARRAY_0;
-// E9C3C: using guessed type int x_DWORD_E9C3C;
+// E9C3C: using guessed type int ptrMemoryBuffer_E9C3C;
 // 180628: using guessed type int pdwScreenBuffer_351628;
 
 //----- (0006EF10) --------------------------------------------------------
@@ -1927,7 +1976,7 @@ void drawBitmap640_8F8E8(int16_t posx, int16_t posy, bitmap_pos_struct_t temppst
 //----- (00090164) --------------------------------------------------------
 void DrawLineLowRes_90164(int16_t posStartX, int16_t posStartY, int16_t posEndX, int16_t posEndY, uint8_t colorIdx)
 {
-	uint8_t* pixel; // edi
+	uint8_t* pixel;
 	uint16_t v6; // dx
 	uint8_t v7; // ebx
 	int v8; // esi
@@ -1973,7 +2022,7 @@ void DrawLineLowRes_90164(int16_t posStartX, int16_t posStartY, int16_t posEndX,
 //----- (000901E4) --------------------------------------------------------
 void DrawLineHighRes_901E4(int16_t posStartX, int16_t posStartY, int16_t posEndX, int16_t posEndY, uint8_t colorIdx)//2711e4
 {
-	x_BYTE* v5; // edi
+	uint8_t* pixel; // edi
 	__int16 v6; // dx
 	int v7; // ebx
 	int v8; // esi
@@ -1985,7 +2034,7 @@ void DrawLineHighRes_901E4(int16_t posStartX, int16_t posStartY, int16_t posEndX
 		if (!DefaultResolutions())
 			helpWidth = screenWidth_18062C;
 
-	v5 = (x_BYTE*)(helpWidth * posStartY + pdwScreenBuffer_351628 + posStartX);
+	pixel = (uint8_t*)(helpWidth * posStartY + pdwScreenBuffer_351628 + posStartX);
 	v6 = posEndY;
 	v10 = (unsigned __int16)(helpWidth - posEndX);
 	if (x_WORD_E36D4 & 4)
@@ -1997,11 +2046,11 @@ void DrawLineHighRes_901E4(int16_t posStartX, int16_t posStartY, int16_t posEndX
 			v9 = posEndX;
 			do
 			{
-				BYTE1(v7) = *v5;
-				*v5++ = *(x_BYTE*)(v7 + v8);
+				BYTE1(v7) = *pixel;
+				*pixel++ = *(x_BYTE*)(v7 + v8);
 				v9--;
 			} while (v9);
-			v5 += v10;
+			pixel += v10;
 			v6--;
 		} while (v6);
 	}
@@ -2009,8 +2058,8 @@ void DrawLineHighRes_901E4(int16_t posStartX, int16_t posStartY, int16_t posEndX
 	{
 		do
 		{
-			memset(v5, colorIdx, posEndX);
-			v5 += v10 + posEndX;
+			memset(pixel, colorIdx, posEndX);
+			pixel += v10 + posEndX;
 			v6--;
 		} while (v6);
 	}

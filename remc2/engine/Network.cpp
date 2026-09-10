@@ -1,5 +1,9 @@
 #include "Network.h"
 
+// Defined in EventsFunctions.cpp; declared here rather than by including that header, which
+// this file does not otherwise need.
+void DestroyPlayerCastle(int player);
+
 //#define PRINT_UPDATE_CONNECTIONS
 
 //char x_BYTE_E126D = 0; // weak
@@ -20,6 +24,13 @@ char connected_E12CE[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // idb
 
 
 char nethID[7] = "TESTER";
+
+// True while the level is running.  A peer that disappears has to be dealt with differently
+// in the lobby (the menu code notices) and in the game (nobody does).
+bool g_inGameLoop = false;
+
+// See Network.h.  Bumped when an automated match ends and another is due.
+int g_autotest_match = 0;
 
 __int16 x_WORD_E131A = 0; // weak
 
@@ -72,12 +83,13 @@ void WaitForNcb_diag(myNCB* ncb, const char* what)
 		if (waited >= 3 && waited - reported >= 3)
 		{
 			reported = waited;
-			debug_net_printf("STUCK: %s pending %lds - cmd=0x%02X ret=0x%02X lsn=%d name=[%.16s] call=[%.16s]\n",
-				what, waited, (int)ncb->ncb_command_0, (int)ncb->ncb_retcode_1, (int)ncb->ncb_lsn_2,
-				ncb->ncb_name_26, ncb->ncb_callName_10);
+			if (CommandLineParams.DoNetworkDebug())
+				debug_net_printf("STUCK: %s pending %lds - cmd=0x%02X ret=0x%02X lsn=%d name=[%.16s] call=[%.16s]\n",
+					what, waited, (int)ncb->ncb_command_0, (int)ncb->ncb_retcode_1, (int)ncb->ncb_lsn_2,
+					ncb->ncb_name_26, ncb->ncb_callName_10);
 		}
 	}
-	if (reported)
+	if (reported && CommandLineParams.DoNetworkDebug())
 		debug_net_printf("STUCK: %s completed after %lds with 0x%02X\n",
 			what, ((long)j___clock() - start) / 100, (int)ncb->ncb_cmd_cplt_49);
 }
@@ -187,6 +199,8 @@ void NetworkListenAll_7302E()//25402e
 	}
 }
 
+void ResetRewireState();
+
 //----- (0007308F) --------------------------------------------------------
 int NetworkInitConnection_7308F(char* a2, __int16 a3)//25408f
 {
@@ -203,8 +217,19 @@ int NetworkInitConnection_7308F(char* a2, __int16 a3)//25408f
 	x_BYTE_E1275 = 0;
 	connected_E12A6 = 0;
 	strcpy(nethID, (char*)a2);
+	extern char oldConnected[8];   // defined next to RemoveDeadClients, further down
 	for (i = 0; maxPlayers_E127A > i; i++)
+	{
 		connected_E12CE[i] = 0;
+		// ...and forget what was connected in the PREVIOUS match.  RemoveDeadClients reports
+		// a peer as vanished when connected_E12CE drops while oldConnected still says it was
+		// there, and oldConnected was never cleared between matches.  So a second match began
+		// by declaring every peer from the first one dead: it cancelled and hung up the
+		// LISTENs that had just been armed (measured armed at 34988, torn down at 35820),
+		// and the peer's data connection then arrived to find nothing to attach to.
+		// -1 is the "nothing known yet" value the array starts life with.
+		oldConnected[i] = -1;
+	}
 	for (i = 0; maxPlayers_E127A > i; i++)
 	{
 		WaitForNcb_diag(connection_E12AE[i], "join: player NCB before add name");
@@ -214,6 +239,17 @@ int NetworkInitConnection_7308F(char* a2, __int16 a3)//25408f
 	// clear stale per-match network state left over from a previous
 	// game before starting this one, otherwise the peers fail to reconnect.
 	ResetNetworkGameState();
+
+	// The token starts at index 0 in every match: index 0 is the side that listens, and
+	// the branch below only assigns the token on the node that gets index 0.  In the
+	// original game that was enough, because losing a peer ended the session for good -
+	// the token could never outlive the match it was moved in.  Now that a survivor plays
+	// on and starts another match, a client that took the token over when the previous
+	// server disappeared carried the value into the new game and still believed it held it,
+	// while the new index 0 believed the same.  Two token holders means two collectors and
+	// no sender: both sat in a receive until the test called it stuck.
+	IndexInNetwork2_E12A8 = 0;
+	ResetRewireState();
 
 	/*
 	//wait for Server AddName
@@ -323,6 +359,80 @@ void NetworkCanceling_73669(__int16 a1)//254669
 	}
 }
 
+// See Network.h for why this is a mask and not the lobby's player count.
+int NetworkConnectedMask()
+{
+	int mask = 0;
+	for (int i = 0; i < maxPlayers_E127A && i < 8; i++)
+		if (connected_E12CE[i] == 1) mask |= (1 << i);
+	if (IndexInNetwork_E1276 >= 0 && IndexInNetwork_E1276 < 8)
+		mask |= (1 << IndexInNetwork_E1276);     // ourselves
+	return mask;
+}
+
+// See Network.h.
+bool NetworkAllRosterPeersConnected()
+{
+	bool present[8];
+	const int marked = NetworkRosterPlayers(nethID, present);
+	if (marked <= 0)
+		return false;                       // the transport has no membership list yet
+	const int mask = NetworkConnectedMask();
+	for (int i = 0; i < 8; i++)
+		if (present[i] && !(mask & (1 << i)))
+			return false;                   // somebody on the list is not in a session with us
+	return true;
+}
+
+// Slots whose node vanished and whose hand-over was already done locally from the roster.
+// SetMultiplayerColors_7CE50 uses this to skip the orderly hand-over for them while still
+// running the rest of its per-slot bookkeeping.
+static bool g_vanishedHandled[8] = { false, false, false, false, false, false, false, false };
+
+// Fill in who is still in the session before the departing node is asked for its own list.
+//
+// The original hand-over starts by RECEIVING that list from the node that is leaving, which
+// works for an orderly departure and not at all for a node that was killed: nothing was
+// sent, NetworkReceiveMessage2_7404E quietly does nothing once the peer is marked
+// disconnected, and locConnected - an uninitialised stack array - was left to decide who
+// takes the token.  In the lobby that handed the token back to the dead player and every
+// survivor called a corpse for ever.
+//
+// connected_E12CE alone cannot answer this either: play is a star around the token holder,
+// so a node has no session with - and no view of - the other survivors.  The transport does
+// know, from the membership list the server broadcasts, so ask it and fall back to local
+// knowledge only if it has nothing to say.  Every node applies the same rule to the same
+// list, so they all reach the same answer without talking to each other.
+static void SeedSurvivors(uint8_t locConnected[8], int16_t leaving)
+{
+	bool present[8];
+	const int marked = NetworkRosterPlayers(nethID, present);
+	for (int i = 0; i < 8; i++)
+		locConnected[i] = (marked > 0) ? (uint8_t)(present[i] ? 1 : 0)
+		                               : (uint8_t)(connected_E12CE[i] == 1);
+	if (leaving >= 0 && leaving < 8)
+		locConnected[leaving] = 0;                 // the node being handled here is gone
+	locConnected[IndexInNetwork_E1276] = 1;        // we are certainly still here
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("SEEDSURV: leaving=%d roster=%d survivors=[%d%d%d%d%d%d%d%d]\n",
+			(int)leaving, marked, locConnected[0], locConnected[1], locConnected[2],
+			locConnected[3], locConnected[4], locConnected[5], locConnected[6], locConnected[7]);
+}
+
+// See Network.h.  Not part of the original - the original never returns from a network match
+// to the menu and back into another one within a single run.
+void NetworkLeaveSession()
+{
+	if (!x_BYTE_E1274 || !x_BYTE_E1275) return;   // nothing allocated, or not in a session
+	if (IndexInNetwork_E1276 < 0) return;
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("MATCHEND: leaving the network session (index %d)\n", (int)IndexInNetwork_E1276);
+
+	NetworkCanceling_73669(IndexInNetwork_E1276);  // hang up peers, drop our name, clear the flag
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("MATCHEND: session released\n");
+}
+
 //----- (0007373D) --------------------------------------------------------
 void NetworkEvent_7373D(int16_t a1)//25473d
 {
@@ -349,6 +459,7 @@ void NetworkEvent_7373D(int16_t a1)//25473d
 			}
 			else
 			{
+				SeedSurvivors(locConnected, a1);
 				NetworkReceiveMessage2_7404E(IndexInNetwork2_E12A8, locConnected, 8u);
 				NetworkCanceling_73669(a1);
 				for (i = 0; maxPlayers_E127A > i; i++)
@@ -447,6 +558,7 @@ void NetworkSomeChange_73AA1(__int16 a1)//254aa1
 			}
 			else
 			{
+				SeedSurvivors(locConnected, a1);
 				NetworkReceiveMessage2_7404E(IndexInNetwork2_E12A8, locConnected, 8);
 				NetworkRemoveClient_739AD(a1);
 				for (i = 0; maxPlayers_E127A > i; i++)
@@ -524,6 +636,22 @@ void NetworkSendMessage2_74006(unsigned __int16 a1, uint8_t* buffer, unsigned in
 {
 	if (x_BYTE_E1274)
 	{
+		// Who is actually written to, and who is skipped for being "not connected".  The
+		// receiving end already logs what arrives (queued DIRECT_SEND), so the two together
+		// say whether a turn was never sent, or sent and never picked up.
+		if (CommandLineParams.DoNetworkDebug() && a1 < 8)
+		{
+			static int lastSentTo[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+			const int connectedNow = (connected_E12CE[a1] == 1) ? 1 : 0;
+			if (lastSentTo[a1] != connectedNow)
+			{
+				lastSentTo[a1] = connectedNow;
+				debug_net_printf("SENDTO: slot %d %s (size=%u lsn=%d name=[%.16s] call=[%.16s])\n",
+					(int)a1, connectedNow ? "is written to" : "is SKIPPED - not connected",
+					size, (int)connection_E12AE[a1]->ncb_lsn_2,
+					connection_E12AE[a1]->ncb_name_26, connection_E12AE[a1]->ncb_callName_10);
+			}
+		}
 		if (connected_E12CE[a1] == 1)
 			NetworkSendMessage_74EF1(connection_E12AE[a1], buffer, size);
 	}
@@ -553,6 +681,19 @@ uint8_t ownSliceBuffer[4096];
 void ReceiveSendAll_7438A(uint8_t* buffer, unsigned int size)//25538a
 {
 	RemoveDeadClients();
+	// Re-aim the connections if the server role has moved, from HERE.
+	//
+	// This is where a node in the lobby actually spins: after a hand-over both survivors were
+	// found here and NOT in the menu loop, so a check placed there was never reached - measured,
+	// the follower stopped reporting for seventy seconds while this exchange kept running.
+	//
+	// Only in the lobby (!g_inGameLoop) and only while the session is up (x_BYTE_E1275): in a
+	// level every pair already holds a session and there is nothing to re-aim, and doing this
+	// while a match is being torn down cancels NCBs that are on their way out, which killed an
+	// instance outright when this lived in the per-tick update.
+	if (!g_inGameLoop && x_BYTE_E1275)
+		NetworkRewireAfterServerChange();
+
 	if (x_BYTE_E1274)
 	{
 		if (IndexInNetwork_E1276 == IndexInNetwork2_E12A8)
@@ -731,7 +872,8 @@ uint8_t NetworkAddName_74767(/*signed __int16* a1,*/ myNCB* connection, char* na
 		if (waited - addNameReported >= 30)
 		{
 			addNameReported = waited;
-			debug_net_printf("WAITING: add name [%.16s] not answered for %lds\n", connection->ncb_name_26, waited);
+			if (CommandLineParams.DoNetworkDebug())
+				debug_net_printf("WAITING: add name [%.16s] not answered for %lds\n", connection->ncb_name_26, waited);
 		}
 		WaitToConnect_7C230();//25d36d
 	}
@@ -926,6 +1068,215 @@ void NetworkSendMessage_74EF1(myNCB* connection, uint8_t* inbuffer, unsigned int
 }
 
 char oldConnected[8] = { -1, -1, -1, -1, -1, -1, -1, -1 }; // idb
+// A peer vanished without warning - killed process, lost machine - rather than leaving in
+// an orderly way.  NetworkSomeChange_73AA1 cannot be used for this: it starts by receiving
+// the survivor list from the node that is going away, and nobody sent one.  Everything is
+// therefore worked out locally, and because every node applies the same rule to the same
+// facts, they all reach the same answer without talking to each other.
+//
+// The original does not do any of this.  Its exchange (sub_7438A) neither checks return
+// codes nor reacts to them: on a LAN of the day, a machine that died ended the session.
+static void NetworkPeerVanished_73AA1b(int16_t lost)
+{
+	if (!x_BYTE_E1274 || !x_BYTE_E1275)
+		return;
+
+	NetworkCanceling_73669(lost);
+	D41A0_0.array_0x2BDE[lost].byte_0x006_2BE4_11236 = 0;   // no longer in the game
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("PEERGONE: player %d vanished (token holder was %d)\n",
+			(int)lost, (int)IndexInNetwork2_E12A8);
+
+	if (IndexInNetwork2_E12A8 != lost)
+		return;                                            // the token did not die with it
+
+	// Who is left.  Taken from the roster rather than the in-game flags, so this works in
+	// the lobby too - there the flags are not filled in yet, and a node cannot see the
+	// players it holds no session with anyway.
+	uint8_t survivors[8];
+	SeedSurvivors(survivors, lost);
+
+	// The token passes to the lowest-numbered player still in the game - the same rule the
+	// control server uses, and computable by everyone from what they already know.
+	int16_t next = -1;
+	for (int i = 0; i < maxPlayers_E127A; i++)
+	{
+		if (i == lost) continue;
+		if (survivors[i])
+		{
+			next = (int16_t)i;
+			break;
+		}
+	}
+	if (next < 0)
+		return;
+
+	IndexInNetwork2_E12A8 = next;
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("PEERGONE: token moves to %d (I am %d)\n", (int)next, (int)IndexInNetwork_E1276);
+
+	// The survivors only ever had a session with the node that died, so they have to be
+	// introduced to each other again: the new token holder listens, everybody else calls it.
+	if (IndexInNetwork2_E12A8 == IndexInNetwork_E1276)
+	{
+		for (int i = 0; i < maxPlayers_E127A; i++)
+		{
+			if (i == IndexInNetwork_E1276 || i == lost) continue;
+			if (!survivors[i]) continue;
+			NetworkListen_74B75(i);
+		}
+	}
+	else
+	{
+		NetworkCall_74809(IndexInNetwork2_E12A8);
+	}
+}
+
+// The server role has moved: point everybody's connections at whoever holds it now.
+//
+// The game's topology is a hub and spokes with the hub pinned to slot 0: NetworkInitConnection
+// _7308F has index 0 listen on every other slot and everybody else call index 0, and it runs
+// once, when the session is joined.  When the host goes away in the LOBBY that arrangement is
+// left pointing at a node that no longer exists - measured: the survivor kept a CALL to
+// [NETH200] pending for the rest of the run, the transport happily resolved that name to the
+// dead host's port, and the node that had taken the role over sat listening to nobody, so
+// neither of them ever started the level.  In a level it does not show, because by then every
+// pair already holds a session.
+//
+// So the same two primitives are used again with the roles as they are now: the new server
+// listens on every other slot, and everybody else calls the slot the new server occupies.
+// The slot is worked out from the transport's membership list, whose lowest surviving entry is
+// exactly the node the hand-over picks.
+// Remembered between calls, and cleared for every new match by NetworkInitConnection_7308F:
+// a slot remembered from the previous game would make the first look at a freshly built
+// set of connections count as a hand-over, and pull them down again.
+static int  g_rewireLastServerSlot = -1;
+static long g_rewireLastAttempt = 0;
+void ResetRewireState() { g_rewireLastServerSlot = -1; g_rewireLastAttempt = 0; }
+
+void NetworkRewireAfterServerChange()
+{
+	bool present[8];
+	const int marked = NetworkRosterPlayers(nethID, present);
+	if (marked <= 0)
+		return;                       // nothing to go on yet
+
+	int serverSlot = -1;
+	for (int i = 0; i < 8; i++)
+		if (present[i]) { serverSlot = i; break; }
+	if (serverSlot < 0)
+		return;
+
+	// Act when the role moves, and then keep trying while this node is still not connected
+	// to whoever holds it.  One attempt is not enough: the two sides re-aim independently, and
+	// measured, the follower called 1.7 s before the new server had armed its LISTEN, so its
+	// connection was parked and timed out with nobody to adopt it - after which nothing tried
+	// again and both sat in the lobby.  Retrying stops as soon as the session is up, so this
+	// costs nothing once the two have found each other.
+	int&  lastServerSlot = g_rewireLastServerSlot;
+	long& lastAttempt    = g_rewireLastAttempt;
+	// The FIRST observation is not a change.  NetworkInitConnection_7308F has just set the
+	// connections up; cancelling and re-issuing them here because this function had not seen a
+	// server slot before tore down the handshake that was still in progress, and the clients
+	// never reached the level at all.
+	if (lastServerSlot < 0)
+	{
+		lastServerSlot = serverSlot;
+		lastAttempt = (long)j___clock();
+		return;
+	}
+	const bool  moved = (serverSlot != lastServerSlot);
+	const bool  connectedToServer = (serverSlot == IndexInNetwork_E1276)
+		|| (connected_E12CE[serverSlot] == 1);
+	if (!moved)
+	{
+		if (connectedToServer) return;
+		if (((long)j___clock() - lastAttempt) < 100) return;   // j___clock() ticks are 1/100 s
+	}
+	lastServerSlot = serverSlot;
+	lastAttempt = (long)j___clock();
+
+	if (CommandLineParams.DoNetworkDebug())
+		debug_net_printf("REWIRE: server is now slot %d, I am %d (%s)\n",
+			serverSlot, (int)IndexInNetwork_E1276,
+			IndexInNetwork_E1276 == serverSlot ? "listening for the rest" : "calling it");
+
+	// First put down the slots of nodes the membership list no longer has.  A slot left over
+	// from a node that has gone still carries a LISTEN or a CALL, and a connection meant for
+	// somebody else gets adopted into it - measured after a hand-over: the new server accepted
+	// the survivor into the dead host's slot and went on writing to "slot 0 ... call=[NETH200]",
+	// so the two of them held a session that neither of their player slots knew about and the
+	// lobby never counted a second player.
+	for (int i = 0; i < maxPlayers_E127A; i++)
+	{
+		if (i == IndexInNetwork_E1276) continue;
+		if (present[i]) continue;                    // still with us
+		if (connected_E12CE[i] != 1 && connection_E12AE[i]->ncb_cmd_cplt_49 == 0) continue;
+		if (CommandLineParams.DoNetworkDebug())
+			debug_net_printf("REWIRE: slot %d is nobody now, putting it down\n", i);
+		NetworkCancel_748F7(i);
+		NetworkHangUp_74B19(connection_E12AE[i]);
+		connected_E12CE[i] = 0;
+	}
+
+	// The token goes with the role.  In the lobby everybody sends their slice to the token
+	// holder and it hands the assembled array back, so a token left on a node that has gone
+	// means every record is addressed to nobody: measured after a hand-over, both survivors
+	// still reported "token=0" and their only writes were to "slot 0 ... call=[NETH200]", so
+	// neither ever saw the other and the lobby counted one player for ever.
+	//
+	// NetworkPeerVanished_73AA1b moves it when a peer is noticed dying in a running session;
+	// this path is the one where nobody notices, because the slots were already down between
+	// matches when the host left.
+	if (IndexInNetwork2_E12A8 != serverSlot)
+	{
+		if (CommandLineParams.DoNetworkDebug())
+			debug_net_printf("REWIRE: token moves from %d to %d\n",
+				(int)IndexInNetwork2_E12A8, serverSlot);
+		// Carry the table the token holder keeps.  Colours live in the token holder's record
+		// (FindFreeColorIndex_7D230 reads array_BYTE_17DE68x[token].playerIndex_1[]), and so does
+		// the chosen level.  Moving the token to a record that has never held them leaves every
+		// slot reading colour 0, and "the first free colour" then hands the same one to everybody
+		// - which is what two wizards in one colour looks like.
+		// ...but only from a record that still holds something.  The slot the token is leaving
+		// belongs to a node that has gone, and its record may already have been cleared - copying
+		// that gives every slot colour 0 (so everybody ends up the same colour) and level 0, which
+		// is not even a multiplayer level.  The lobby sets a sensible level of its own on entry,
+		// so when there is nothing to carry, leaving it alone is right.
+		const int oldToken = IndexInNetwork2_E12A8;
+		if (oldToken >= 0 && oldToken < 8 && serverSlot < 8
+			&& x_DWORD_17DE38str.array_BYTE_17DE68x[oldToken].makeUpdate_0)
+		{
+			for (int c = 0; c < 8; c++)
+				x_DWORD_17DE38str.array_BYTE_17DE68x[serverSlot].playerIndex_1[c] =
+					x_DWORD_17DE38str.array_BYTE_17DE68x[oldToken].playerIndex_1[c];
+			if (x_DWORD_17DE38str.array_BYTE_17DE68x[oldToken].selectedLevel_10 >= 50)
+				x_DWORD_17DE38str.array_BYTE_17DE68x[serverSlot].selectedLevel_10 =
+					x_DWORD_17DE38str.array_BYTE_17DE68x[oldToken].selectedLevel_10;
+		}
+		IndexInNetwork2_E12A8 = (int16_t)serverSlot;
+	}
+
+	if (IndexInNetwork_E1276 == serverSlot)
+	{
+		for (int i = 0; i < maxPlayers_E127A; i++)
+		{
+			if (i == IndexInNetwork_E1276) continue;
+			if (connected_E12CE[i] == 1) continue;      // already talking to that one
+			NetworkCancel_748F7(i);                     // drop whatever was aimed at the old host
+			NetworkListen_74B75(i);
+		}
+	}
+	else
+	{
+		if (connected_E12CE[serverSlot] != 1)
+		{
+			NetworkCancel_748F7(serverSlot);
+			NetworkCall_74809(serverSlot);
+		}
+	}
+}
+
 void RemoveDeadClients()
 {
 	for (int i = 0; i < maxPlayers_E127A; i++)
@@ -936,8 +1287,49 @@ void RemoveDeadClients()
 			{
 				NetworkCancel_748F7(i);
 				NetworkHangUp_74B19(connection_E12AE[i]);
+				// The flags stay exactly as the original set them: action_9 = 1 is what makes
+				// SetMultiplayerColors_7CE50 blank the palette entry AND clear makeUpdate_0
+				// again.  Leaving the previous action in place instead means the slot keeps
+				// makeUpdate_0 set for ever - cases 2/3/4 never clear it - and re-runs that
+				// stale action every frame, which for a "select character" action re-rolls
+				// colours through FindFreeColorIndex_7D230 and lands two wizards on one
+				// colour.
 				x_DWORD_17DE38str.array_BYTE_17DE68x[i].makeUpdate_0 = 1;
 				x_DWORD_17DE38str.array_BYTE_17DE68x[i].action_9 = 1;
+				// What must NOT run for this slot is the ORDERLY hand-over that action_9 = 1
+				// normally triggers: NetworkSomeChange_73AA1 begins by receiving the survivor
+				// list from the node that is leaving, and a node that was killed sent none.
+				// Mark the slot so that dispatch is skipped, and do the hand-over here from
+				// the roster instead - which is right in the lobby for exactly the same
+				// reason it is right in the game.
+				g_vanishedHandled[i] = true;
+				NetworkPeerVanished_73AA1b((int16_t)i);
+				// A node that vanished left its castle behind just as surely as one that walked out
+				// of the menu - a dropped connection is the same thing to everyone still playing.
+				// Every survivor notices the same peer, so they all do this for the same player and
+				// the castle goes on every screen without anything being sent.
+				DestroyPlayerCastle(i);
+
+				// ...and leave the slot able to take somebody new.  The original only tore it down:
+				// the LISTEN armed for the peer is cancelled and hung up just above, and nothing
+				// ever arms another one, so a newcomer that takes the freed name and the freed index
+				// calls into a slot nobody is listening on.  Measured before this: the newcomer
+				// reported "myIdx=1" and both sides exchanged nothing for the rest of the run.
+				//
+				// Only the listening node re-arms.  A joining node always calls the first one, and
+				// index 0 is the side that listens (NetworkInitConnection_7308F: index 0 listens on
+				// every other slot, everybody else calls).
+				// Only while the session is still up (x_BYTE_E1275).  Ending a match takes the peers
+				// away as well, and arming a LISTEN on a session that is being torn down is pointless
+				// at best.  (It was suspected of breaking the next match too - it was not; that was
+				// the scores screen waiting for a keypress.  The guard is kept because it is right,
+				// not because it fixed that.)
+				if (x_BYTE_E1275 && IndexInNetwork_E1276 == 0 && i != IndexInNetwork_E1276)
+				{
+					if (CommandLineParams.DoNetworkDebug())
+						debug_net_printf("SLOTFREE: listening again on slot %d for a newcomer\n", i);
+					NetworkListen_74B75(i);
+				}
 			}
 			oldConnected[i] = connected_E12CE[i];
 		}
@@ -960,11 +1352,46 @@ void NetworkUpdateConnections_74F76()//255f76
 //----- (00074FE1) --------------------------------------------------------
 signed int NetworkGetState_74FE1(__int16 a1)//255fe1
 {
+	// A message longer than the buffer the RECEIVE offered comes back truncated, with this in
+	// the completion byte (NRC_BUFLEN in port_net.cpp).  It says nothing about the link: the
+	// session is up, the peer is talking, only that one message did not fit.  The test below
+	// reads every non-zero completion code as "no longer connected" though, and
+	// RemoveDeadClients() answers that by hanging the session up and declaring the peer gone -
+	// so a single oversized message ended a perfectly healthy session.
+	//
+	// It only bit when nothing followed quickly.  Any later command completing with
+	// NRC_GOODRET puts the slot back, which is why in the same run the host shrugged its
+	// BUFLEN off - a SEND came right behind it - while the third player, with nothing to send,
+	// kept 0x06 in the byte, was pronounced dead, and left both survivors talking to nobody.
+	const uint8_t NCB_CPLT_BUFLEN = 0x06;
+
 	signed int v2;
 	if (a1 == IndexInNetwork_E1276)
 		v2 = 2;
 	else
-		v2 = connection_E12AE[a1]->ncb_lsn_2 && !connection_E12AE[a1]->ncb_cmd_cplt_49;
+	{
+		const uint8_t cplt = connection_E12AE[a1]->ncb_cmd_cplt_49;
+		v2 = connection_E12AE[a1]->ncb_lsn_2 && (cplt == 0 || cplt == NCB_CPLT_BUFLEN);
+	}
+
+	// This is what decides whether a peer is sent anything at all, so when somebody is
+	// connected but never spoken to, this is the number to look at.  Reported only when it
+	// changes, or the per-turn call would bury the log.
+	if (CommandLineParams.DoNetworkDebug() && a1 != IndexInNetwork_E1276)
+	{
+		static signed int lastState[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+		static uint8_t    lastCplt[8] = { 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE };
+		if (a1 >= 0 && a1 < 8
+			&& (lastState[a1] != v2 || lastCplt[a1] != connection_E12AE[a1]->ncb_cmd_cplt_49))
+		{
+			lastState[a1] = v2;
+			lastCplt[a1] = connection_E12AE[a1]->ncb_cmd_cplt_49;
+			debug_net_printf("SLOTSTATE: slot %d connected=%d lsn=%d cplt=0x%02X cmd=0x%02X name=[%.16s] call=[%.16s]\n",
+				(int)a1, (int)v2, (int)connection_E12AE[a1]->ncb_lsn_2,
+				(int)connection_E12AE[a1]->ncb_cmd_cplt_49, (int)connection_E12AE[a1]->ncb_command_0,
+				connection_E12AE[a1]->ncb_name_26, connection_E12AE[a1]->ncb_callName_10);
+		}
+	}
 	return v2;
 }
 
@@ -1095,7 +1522,13 @@ bool SetMultiplayerColors_7CE50()//25de50
 				sub_41A90_VGA_Palette_install(x_DWORD_17DE38str.palette_17DE38x);
 
 				x_DWORD_17DE38str.array_BYTE_17DE68x[i].makeUpdate_0 = 0;
-				NetworkSomeChange_73AA1(i);
+				// A slot whose node vanished has already been handed over from the roster in
+				// RemoveDeadClients; the orderly path below would try to receive a survivor
+				// list that nobody sent.
+				if (g_vanishedHandled[i])
+					g_vanishedHandled[i] = false;
+				else
+					NetworkSomeChange_73AA1(i);
 				if (i == x_DWORD_17DE38str.serverIndex_17DEFC)
 					result = true;
 				break;
@@ -1125,7 +1558,23 @@ bool SetMultiplayerColors_7CE50()//25de50
 				D41A0_0.LevelIndex_0xc = x_DWORD_17DE38str.serverIndex_17DEFC;
 				x_D41A0_BYTEARRAY_4_struct.levelnumber_43w = x_DWORD_17DE38str.array_BYTE_17DE68x[GetIndexNetwork2_74515()].selectedLevel_10;
 				x_D41A0_BYTEARRAY_4_struct.setting_byte1_22 |= Setting::MULTIPLAYER_MODE;
-				D41A0_0.NumberOfPlayers_0xe = x_DWORD_17DE38str.x_WORD_17DEFE;
+				// NumberOfPlayers_0xe is used everywhere as a LOOP BOUND over array_0x2BDE,
+				// not as a population count, and the two agree only while the players fill
+				// slots 0..N-1.  After a server hand-over they do not: the node that died
+				// leaves a hole, so the survivors sit at 1 and 2 while the count is 2 - and
+				// the player in slot 2 falls outside every loop.  It never spawns, its entity
+				// index is never filled in, and drawing its own status bar then divides by a
+				// zero read out of unrelated memory (integer divide-by-zero in
+				// DrawTopStatusBar_2D710, which killed that node a second into the level).
+				//
+				// Take the highest occupied slot instead.  For a normal contiguous game this
+				// is exactly the old number, so nothing changes there.
+				{
+					int highestSlot = -1;
+					for (int s = 0; s < 8; s++)
+						if (x_DWORD_17DE38str.array_BYTE_17DE68x[s].makeUpdate_0) highestSlot = s;
+					D41A0_0.NumberOfPlayers_0xe = (int16_t)(highestSlot + 1);
+				}
 				NetworkCancelAll_7449C();
 				m_ExitMenuLoop_E29DC = 1;
 				result = true;

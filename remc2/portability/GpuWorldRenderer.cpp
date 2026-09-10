@@ -21,13 +21,13 @@ using Microsoft::WRL::ComPtr;
 
 namespace
 {
-	// Size of the shading / blending lookup window of x_BYTE_F6EE0_tablesx that
+	// Size of the shading / blending lookup window of ColourLookupTable_F6EE0 that
 	// the rasteriser can address with its 16 bit (shade << 8 | texel) index.
 	constexpr uint32_t ShadeTableWidth = 256;
 	constexpr uint32_t ShadeTableHeight = 256;
 	constexpr uint32_t ShadeTableBytes = ShadeTableWidth * ShadeTableHeight;
 
-	// x_BYTE_F6EE0_tablesx holds the 64 shade ramps first and the 256x256
+	// ColourLookupTable_F6EE0 holds the 64 shade ramps first and the 256x256
 	// destination blend table from byte 16384 on.
 	constexpr uint32_t BlendTableOffset = 16384;
 
