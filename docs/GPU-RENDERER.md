@@ -45,6 +45,47 @@ The remaining difference is a sub-pixel sampling offset, not a computation
 error: for 89 % of the differing pixels the GPU value is what the software
 renderer produced at a *neighbouring* pixel. See "Known limitations" below.
 
+Those two rows were measured at view distance 1. The figure grows with the view
+distance, because a longer view fills the lower half of the screen with finely
+resolved distant terrain, which is exactly the material a half pixel offset
+shows up in. At `viewDistanceScale: 2`, level 1, tick 120, still camera:
+
+| | differing pixels | clearly differing (>24/255) |
+|---|---|---|
+| 0.8.1 | 7.04 % | 2.08 % |
+| 0.9.0 | 7.01 % | 2.07 % |
+
+Read that as one number in its own right, not against the 1.44 % above - a
+different scene, not a worse renderer. What makes it a sampling offset rather
+than a defect is the neighbour test, which at that setting finds the GPU value
+next door for **93 %** of all differing pixels and **91.7 %** of the clearly
+differing ones. Per row band the differences sit almost entirely in the lower
+two thirds, the near terrain; the sky stays below 1 %.
+
+### Comparing the GPU against the software renderer
+
+The upstream suite (`--test_renderers`) compares the *HD software* rasteriser
+against the *original* one and never looks at the GPU at all. Nothing else does
+either, so this comparison is worth running by hand before a release:
+
+```
+remc2-gpu --set_level 0 --config_file_path config-gpu-windowed.json --dump_world_frame 120 --mouse_off2 --kill_move_and_rotation
+remc2-gpu --set_level 0 --config_file_path config-sw720-cmp.json --dump_world_frame 120 --mouse_off2 --kill_move_and_rotation
+```
+
+`config-sw720-cmp.json` is the same file with every `gpu*` flag set to `false`,
+so the two runs differ in nothing but the renderer. Compare
+`BufferOut/WorldFrame-gpu.raw` against `BufferOut/WorldFrame-software.raw` -
+the raw palette indices, not the bitmaps. A still camera makes the dumps
+bit-exact and the comparison repeatable; see the note on moving cameras under
+"Development notes".
+
+Judge a result by three numbers together, not by the percentage alone: the share
+of differing pixels, the share of *clearly* differing ones, and the neighbour
+share. A neighbour share around 90 % means the sampling offset; a figure well
+below that means something actually diverged, and the row profile then says
+where to look.
+
 ## How it fits together
 
 The renderer keeps the original painter's algorithm. There is no depth buffer
