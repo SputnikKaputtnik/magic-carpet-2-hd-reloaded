@@ -1,6 +1,6 @@
 # What's new
 
-## Unreleased
+## 0.9.0 (2026-09-10)
 
 * **Merged upstream `development` (52e0c1b, 48 commits)** - the network rework,
   multiplayer scores, popup messages and "fix load game" from the base project.
