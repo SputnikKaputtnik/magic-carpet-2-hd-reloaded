@@ -1,5 +1,17 @@
 # What's new
 
+## Unreleased
+
+* **F8** - The exit warp trail is kept at 16 bits per channel instead of 8.
+  The trail moves towards the world by `1 - exp(-dt/decay)` per frame, about
+  1.2 % at 60 fps with the default 1400 ms - three steps of a 255 step
+  channel. Once trail and world came closer than roughly 85 steps the
+  increment rounded to zero: the fade stalled on a faint ghost until
+  something larger pushed it out, and because the rounding lands per channel
+  an even fade could break into patches. Costs one buffer pair more, 32 MB
+  instead of 16 at 4K. Dithering the rounding away was the alternative -
+  which is the grain this design moved behind the palette resolve to avoid.
+
 ## 0.9.0 (2026-09-10)
 
 * **Merged upstream `development` (52e0c1b, 48 commits)** - the network rework,
@@ -80,7 +92,6 @@ D3D11 renderer are referenced as F1..F8.
 * Gouraud shaded terrain (raster mode 5) deviates from the software renderer
   in some levels (Level 8: ~22 % of pixels).
 * Review findings F2 (CPU fallback sprites lose painter order), F6 (colour
-  index 0 treated as "not drawn by the CPU"), F7 (transparent UI blends
-  against the cleared viewport) and F8 (8-bit warp history quantisation)
-  are open. F6 and F7 share a fix: read the world indices back before the
-  UI is drawn.
+  index 0 treated as "not drawn by the CPU") and F7 (transparent UI blends
+  against the cleared viewport) are open. F6 and F7 share a fix: read the
+  world indices back before the UI is drawn. F8 is fixed, see Unreleased.

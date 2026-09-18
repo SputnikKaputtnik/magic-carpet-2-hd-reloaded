@@ -77,8 +77,9 @@ remc2-gpu --set_level 0 --config_file_path config-sw720-cmp.json --dump_world_fr
 so the two runs differ in nothing but the renderer. Compare
 `BufferOut/WorldFrame-gpu.raw` against `BufferOut/WorldFrame-software.raw` -
 the raw palette indices, not the bitmaps. A still camera makes the dumps
-bit-exact and the comparison repeatable; see the note on moving cameras under
-"Development notes".
+repeatable — but run each side twice and check the two agree before comparing
+them with each other; see the note on mouse contamination under "Development
+notes", which is not fully closed by any switch.
 
 Judge a result by three numbers together, not by the percentage alone: the share
 of differing pixels, the share of *clearly* differing ones, and the neighbour
@@ -207,14 +208,25 @@ from the presenter's `Initialize` into `SupportsWarpBlur()`.
 
 Two things cost real time during development and are worth knowing:
 
-* **A/B dumps are contaminated by mouse movement.** `--dump_world_frame N`
-  renders a specific simulation tick, but yaw and pitch stay mouse controlled,
-  and D3D11 needs a real window even with `--hide_graphics`. Moving the mouse
-  during a comparison run changes the view direction and therefore the whole
-  image. Starting the process minimised keeps the pointer out of the window
-  (`Start-Process -WindowStyle Minimized`); a reference that differs from an
-  earlier run of the same build and configuration is contaminated, not a
-  regression. Repeat any surprising result before suspecting the code.
+* **A/B dumps are contaminated by mouse movement, and the switches do not
+  reliably prevent it.** `--dump_world_frame N` renders a specific simulation
+  tick, but yaw and pitch stay mouse controlled, and D3D11 needs a real window
+  even with `--hide_graphics`. Moving the mouse during a comparison run changes
+  the view direction and therefore the whole image.
+
+  `--mouse_off2 --kill_move_and_rotation` reduce this but **do not close it**.
+  Measured on 2026-09-18: five dumps of the same scene, all with both switches
+  set — four came out bit-identical, the fifth differed in 56 % of its pixels
+  because the pointer crossed the window while it ran. That one run was very
+  nearly read as a rendering regression.
+
+  So treat a still camera as *usually* bit-exact, not as guaranteed. What
+  actually holds: **repeat every measurement.** Two runs that agree are worth
+  more than one run with the right switches. A dump that differs from an
+  earlier run of the same build and configuration is contaminated until proven
+  otherwise — never the first suspect for a code change. Starting the process
+  minimised helps (`Start-Process -WindowStyle Minimized`), and announcing a
+  run to whoever is at the keyboard helps more.
 * **`--test_renderers` forces every GPU stage off.** The suite compares the HD
   software renderer against the original one on the CPU, so with the stages on
   (their default since 0.8.1) the HD image is on the GPU, the CPU buffer holds

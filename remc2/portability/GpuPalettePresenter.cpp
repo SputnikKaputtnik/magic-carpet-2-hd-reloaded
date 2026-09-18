@@ -251,7 +251,17 @@ struct GpuPalettePresenter::Impl
 		description.Height = static_cast<UINT>(height);
 		description.MipLevels = 1;
 		description.ArraySize = 1;
-		description.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		// 16 bits per channel, not 8.  The trail moves towards the world by
+		// 1 - exp(-dt/decay) per frame, which at 60 fps and the default 1400 ms
+		// is about 1.2 % - three steps of a 255 step channel.  Once trail and
+		// world are closer than roughly 85 steps the increment rounds to zero
+		// and the fade stalls: a faint ghost sits there until something larger
+		// pushes it out, and the rounding lands per channel, so what should be
+		// an even fade breaks into patches.  The wider format costs one extra
+		// buffer pair - 32 MB instead of 16 at 4K - and dithering the rounding
+		// away was the alternative, which is exactly the grain this design
+		// moved behind the palette resolve to avoid.  (Review finding F8.)
+		description.Format = DXGI_FORMAT_R16G16B16A16_UNORM;
 		description.SampleDesc.Count = 1;
 		description.Usage = D3D11_USAGE_DEFAULT;
 		description.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
