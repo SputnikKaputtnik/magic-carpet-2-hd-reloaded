@@ -46,7 +46,7 @@ namespace
 
 	// Bit 24 of the packed vertex field marks "texel comes from the sprite
 	// atlas, uv is absolute"; bits 0..7 then hold the sprite pixel mode
-	// (dword0x01_rotIdx) instead of the terrain shading mode.
+	// (dword0x01_visibilityIdx) instead of the terrain shading mode.
 	constexpr uint32_t SpriteSourceFlag = 1u << 24;
 
 	// Bit 25 marks the sky quad, which derives its texel from the pixel
@@ -208,7 +208,7 @@ float4 main(VertexOutput input) : SV_TARGET
     {
         // World sprite (DrawSprite_41BD3): uv addresses the sprite atlas
         // directly, index 0 is transparent, the mode byte is the sprite pixel
-        // mode dword0x01_rotIdx.
+        // mode dword0x01_visibilityIdx.
         // The CPU blit's DDA never leaves the bitmap; fragments at the slanted
         // quad edges whose pixel-centre corrected uv falls outside read the
         // edge texel, exactly like the blit.  Without the clamp a strongly

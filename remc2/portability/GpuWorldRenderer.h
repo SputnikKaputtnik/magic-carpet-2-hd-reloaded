@@ -40,7 +40,7 @@ struct GpuSpriteQuad
 	const uint8_t* pixels = nullptr; // height rows of width bytes, stride = width
 	int width = 0;
 	int height = 0;
-	uint8_t mode = 0;     // dword0x01_rotIdx: 0 copy, 1 shade LUT, 4/5 colour blend
+	uint8_t mode = 0;     // dword0x01_visibilityIdx: 0 copy, 1 shade LUT, 4/5 colour blend
 	uint8_t constant = 0; // shade level (mode 1) or player colour (mode 4/5)
 };
 
