@@ -34,6 +34,7 @@ extern int config_skip_screen;
 extern int texturepixels;
 extern int maxGameFps;
 extern int simulationFps;
+extern bool fixManaSphereColour;
 extern int menuFps;
 extern int displayIndex;
 extern int windowResWidth;

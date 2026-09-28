@@ -189,6 +189,8 @@ Config::Settings::Game Config::GetGame(const json& settings)
 		if (game.contains("simulationFps"))
 			gameValues.m_SimulationFps = ReadIntValue(game, "simulationFps");
 		gameValues.m_SkipIntro = ReadBoolValue(game, "skipIntro");
+		if (game.contains("fixManaSphereColour"))
+			gameValues.m_FixManaSphereColour = ReadBoolValue(game, "fixManaSphereColour");
 	}
 	return gameValues;
 }
@@ -553,6 +555,7 @@ void Config::SaveGameToDoc(Config::Settings::Game gameSettings)
 	SetInt(game, "maxGameFps", gameSettings.m_MaxGameFps);
 	SetInt(game, "simulationFps", gameSettings.m_SimulationFps);
 	SetBool(game, "skipIntro", gameSettings.m_SkipIntro);
+	SetBool(game, "fixManaSphereColour", gameSettings.m_FixManaSphereColour);
 }
 
 void Config::SaveControlsToDoc(Config::Settings::Controls controlSettings)

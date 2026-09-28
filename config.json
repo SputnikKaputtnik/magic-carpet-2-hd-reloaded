@@ -97,10 +97,12 @@
 			"game": {
 				"description": [
 					"maxGameFps: presentation frame-rate limit. Delete or set to 0 to unlock",
-					"simulationFps: fixed game-logic rate, independent of presentation. 24 preserves the original ReMC2 game speed"
+					"simulationFps: fixed game-logic rate, independent of presentation. 24 preserves the original ReMC2 game speed",
+					"fixManaSphereColour: mana spheres show their current owner's colour. false = original behaviour, where a resting sphere keeps the colour of its previous owner"
 				],
 				"maxGameFps": 24,
-				"simulationFps": 24
+				"simulationFps": 24,
+				"fixManaSphereColour": true
 			},
 			"controls": {
 				"mouse": [

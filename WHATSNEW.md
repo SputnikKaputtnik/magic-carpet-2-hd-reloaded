@@ -1,7 +1,21 @@
 # What's new
 
-## Unreleased
+## 0.9.1 (2026-09-28)
 
+* **Merged upstream `development` (c769164, 57 commits)** - decompilation
+  fixes (archer, invisibility, castle countdown, sub_33C70, sub_3A8B0,
+  sub_10C80, sub_1C310), the signed byte union that brings back dead code
+  such as the transparency render, the `rotIdx` -> `visibilityIdx` rename and
+  the rewritten regression test runner with DOSBox-X recordings of levels 1-5.
+  With the option below switched off this fork passes the same 40 of 42
+  regression tests as upstream (levels 22 and 25 fail there too); the GPU
+  renderer and the fixed simulation rate do not move the simulation.
+* **`game.fixManaSphereColour`** (default `true`) - the mana sphere colour
+  fix from 0.8.2 is now optional. `false` restores the original behaviour,
+  where a resting sphere keeps its previous owner's colour.
+  `regression-config.json` sets it to `false`, because the regression tests
+  compare memory against recordings of the original, and the refreshed
+  sprite index (`word_0x5A_90`) is the only difference they found.
 * **F8** - The exit warp trail is kept at 16 bits per channel instead of 8.
   The trail moves towards the world by `1 - exp(-dt/decay)` per frame, about
   1.2 % at 60 fps with the default 1400 ms - three steps of a 255 step

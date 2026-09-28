@@ -23,6 +23,7 @@ int config_skip_screen;
 int texturepixels = 32;
 int maxGameFps = 30;
 int simulationFps = 24;
+bool fixManaSphereColour = true;
 int menuFps = 30;
 int displayIndex = 0;
 int windowResWidth = 640;
@@ -145,6 +146,7 @@ bool SetConfig() {
 	simulationFps = settingsValue.m_Game.m_SimulationFps > 0
 		? settingsValue.m_Game.m_SimulationFps
 		: 24;
+	fixManaSphereColour = settingsValue.m_Game.m_FixManaSphereColour;
 	if (settingsValue.m_Game.m_SkipIntro)
 		config_skip_screen = 1;
 	else

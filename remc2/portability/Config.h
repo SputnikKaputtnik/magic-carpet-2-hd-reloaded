@@ -112,6 +112,8 @@ public:
 			int m_MaxGameFps = 0;
 			int m_SimulationFps = 24;
 			bool m_SkipIntro = false;
+			// Refresh the mana sphere sprite (owner colour) every tick. false = original behaviour.
+			bool m_FixManaSphereColour = true;
 		};
 
 		struct Mouse

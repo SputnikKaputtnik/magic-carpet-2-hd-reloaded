@@ -40,7 +40,8 @@
 			"game": {
 				"loggingLevel": "Info",
 				"maxGameFps": 0,
-				"skipIntro": true
+				"skipIntro": true,
+				"fixManaSphereColour": false
 			},
 			"controls": {
 				"mouse": [

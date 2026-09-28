@@ -26265,7 +26265,9 @@ void TransformArcherToMana_35940(type_entity_0x6E8E* a1x)//216940 //move mana sp
 				//a1x->axis_0x9A_154x.y = (250 * v27 - (__CFSHL__(250 * v27 >> 31, 8) + (250 * v27 >> 31 << 8))) >> 8;
 				a1x->axis_0x9A_154x.y = (((250 * (int16_t)a1x->axis_0x9A_154x.y - ((250 * (int16_t)a1x->axis_0x9A_154x.y >> 31) << 8)) - cftemp) >> 8);
 			}
-
+			if (!fixManaSphereColour)
+				if (!(a1x->struct_byte_0xc_12_15.byte[1] & 0x20) || v36)
+					SetManaSphereColorAndRot_36920(/*a1x,*/ a1x);
 		}
 		// The sprite index is a cache of (owner colour, size).  The original
 		// refreshed it only inside the movement branch above, and only while
@@ -26273,7 +26275,10 @@ void TransformArcherToMana_35940(type_entity_0x6E8E* a1x)//216940 //move mana sp
 		// colour after an owner change made elsewhere (possession, castle
 		// loss) while balloons of the real owner collected it.  Refresh once
 		// per tick for every sphere; it is a no-op when nothing changed.
-		SetManaSphereColorAndRot_36920(a1x);
+		// fixManaSphereColour = false keeps the original, e.g. for the
+		// regression tests, which compare against DOS recordings.
+		if (fixManaSphereColour)
+			SetManaSphereColorAndRot_36920(a1x);
 		if (a1x->struct_byte_0xc_12_15.byte[1] & 0x20)
 		{
 			v28 = a1x->life_0x8 - 1;
