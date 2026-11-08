@@ -9,10 +9,8 @@
 > upstream.** The 0.9.1 release stays available, but the renderer here will not
 > be developed further.
 >
-> What upstream does not have yet - above all a fixed 24 Hz simulation that lets
-> the picture run at 60 fps and more without speeding the game up, and the
-> optional mana sphere colour fix - is being offered to the base project as pull
-> requests instead.
+> What upstream does not have yet, such as the optional mana sphere colour fix,
+> is being offered to the base project as pull requests instead.
 
 A fork of **Magic Carpet 2 HD** that moves the world renderer from the CPU to
 the GPU (Direct3D 11) while reproducing the original software renderer pixel
