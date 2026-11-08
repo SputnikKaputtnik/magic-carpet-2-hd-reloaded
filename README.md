@@ -1,5 +1,19 @@
 # Magic Carpet 2 HD - Reloaded fork 0.9.1
 
+> **Status (November 2026): this fork is frozen.** Magic Carpet 2 HD now ships
+> its own GPU renderer (Vulkan, `"render": "HW"`) since
+> [0.9.17.0-beta-stable](https://github.com/thobbsinteractive/magic-carpet-2-hd/releases/tag/0.9.17.0-beta-stable),
+> and it is faster than this one: on the same machine, at 3840x2160 with 4x view
+> distance, it reached the display's 120 Hz limit where this fork's Direct3D 11
+> renderer managed 92 fps, with less CPU time per frame. **For playing, use
+> upstream.** The 0.9.1 release stays available, but the renderer here will not
+> be developed further.
+>
+> What upstream does not have yet - above all a fixed 24 Hz simulation that lets
+> the picture run at 60 fps and more without speeding the game up, and the
+> optional mana sphere colour fix - is being offered to the base project as pull
+> requests instead.
+
 A fork of **Magic Carpet 2 HD** that moves the world renderer from the CPU to
 the GPU (Direct3D 11) while reproducing the original software renderer pixel
 for pixel.
